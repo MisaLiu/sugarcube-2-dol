@@ -90,7 +90,7 @@
 				Scripting.evalJavaScript(this.args.full);
 			}
 			catch (ex) {
-				return this.error(`bad evaluation: ${typeof ex === 'object' ? ex.message : ex}`);
+				return this.error(`bad evaluation: ${typeof ex === 'object' ? `${ex.name}: ${ex.message}` : ex}`, null, ex.stack);
 			}
 
 			// Custom debug view setup.
@@ -351,7 +351,7 @@
 				}
 			}
 			catch (ex) {
-				return this.error(`bad evaluation: ${typeof ex === 'object' ? ex.message : ex}`);
+				return this.error(`bad evaluation: ${typeof ex === 'object' ? `${ex.name}: ${ex.message}` : ex}`, null, ex.stack);
 			}
 		}
 	});
@@ -815,7 +815,7 @@
 				}
 			}
 			catch (ex) {
-				return this.error(`bad conditional expression in <<${i === 0 ? 'if' : 'elseif'}>> clause${i > 0 ? ' (#' + i + ')' : ''}: ${typeof ex === 'object' ? ex.message : ex}`); // eslint-disable-line prefer-template
+				return this.error(`bad conditional expression in <<${i === 0 ? 'if' : 'elseif'}>> clause${i > 0 ? ' (#' + i + ')' : ''}: ${typeof ex === 'object' ? `${ex.name}: ${ex.message}` : ex}`, null, ex.stack); // eslint-disable-line prefer-template
 			}
 		}
 	});

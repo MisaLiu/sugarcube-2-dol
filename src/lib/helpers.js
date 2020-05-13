@@ -308,7 +308,7 @@ var { // eslint-disable-line no-var
 	/*
 		Appends an error view to the passed DOM element.
 	*/
-	function throwError(place, message, source) {
+	function throwError(place, message, source, stack) {
 		const $wrapper = jQuery(document.createElement('div'));
 		const $toggle  = jQuery(document.createElement('button'));
 		const $source  = jQuery(document.createElement('pre'));
@@ -346,6 +346,14 @@ var { // eslint-disable-line no-var
 				hidden        : 'hidden'
 			})
 			.appendTo($wrapper);
+		if (stack) {
+			const lines = stack.split('\n');
+			for (const ll of lines) {
+				const div = document.createElement('div');
+				div.append(ll.replace(/file:.*\//, '<path>/'));
+				$source.append(div);
+			}
+		}
 		$wrapper
 			.addClass('error-view')
 			.appendTo(place);
