@@ -31,6 +31,7 @@ const CONFIG = {
 			'src/lib/jquery-plugins.js',
 			'src/lib/util.js',
 			'src/lib/simplestore/simplestore.js',
+			'src/lib/simplestore/adapters/FCHost.Storage.js',
 			'src/lib/simplestore/adapters/webstorage.js',
 			'src/lib/simplestore/adapters/cookie.js',
 			'src/lib/debugview.js',
