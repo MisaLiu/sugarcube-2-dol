@@ -312,7 +312,7 @@ var { // eslint-disable-line no-var
 		const $wrapper = jQuery(document.createElement('div'));
 		const $toggle  = jQuery(document.createElement('button'));
 		const $source  = jQuery(document.createElement('pre'));
-		const mesg     = `${L10n.get('errorTitle')}: ${message || 'unknown error'}`;
+		const mesg     = `${L10n.get('errorTitle')}: ${message || 'unknown error'} ${Config.saves.version}`;
 
 		$toggle
 			.addClass('error-toggle')
