@@ -1744,10 +1744,9 @@
 				/*
 					Attempt to replace values.
 				*/
-				if (typeof value === 'undefined') value = ['(revive:eval)', 'undefined'];
-				else if (value === Infinity) value = ['(revive:eval)', 'Infinity'];
-				else if (value === -Infinity) value = ['(revive:eval)', '-Infinity'];
-				else if (Number.isNaN(value)) value = ['(revive:eval)', 'NaN'];
+				if (typeof value === 'undefined') {
+					value = ['(revive:eval)', 'undefined'];
+				}
 
 				return value;
 			}, space);

@@ -88,7 +88,6 @@ const CONFIG = {
 			'src/css/ui-dialog.css',
 			'src/css/ui.css',
 			'src/css/ui-bar.css',
-			'src/css/idb_backend.css',
 			'src/css/ui-debug.css'
 		]
 	},
@@ -160,17 +159,16 @@ const {
 } = require('./scripts/build-utils');
 const _path = require('path');
 const _opt  = require('node-getopt').create([
-	['b', 'build=VERSION', 'Build only for Twine major version: 1 or 2; default: build for 2.'],
+	['b', 'build=VERSION', 'Build only for Twine major version: 1 or 2; default: build for all.'],
 	['d', 'debug',         'Keep debugging code; gated by DEBUG symbol.'],
 	['u', 'unminified',    'Suppress minification stages.'],
-	['n', 'no-transpile',  'Suppress JavaScript transpilation stages. (unused)'],
-	['t', 'transpile',     'Enable JavaScript transpilation stages.'],
+	['n', 'no-transpile',  'Suppress JavaScript transpilation stages.'],
 	['h', 'help',          'Print this help, then exit.']
 ])
 	.bindHelp()
 	.parseSystem();
 
-let _buildForTwine1 = false;
+let _buildForTwine1 = true;
 let _buildForTwine2 = true;
 
 if (_opt.options.build) {
@@ -298,7 +296,7 @@ function compileJavaScript(filenameObj, options) {
 	let bundle = concatFiles(filenameObj.files);
 
 	// Transpile to ES5 with Babel.
-	if (_opt.options.transpile) {
+	if (!_opt.options.noTranspile) {
 		const { transform } = require('@babel/core');
 		bundle = transform(bundle, {
 			// babelHelpers : 'bundled',
@@ -344,6 +342,7 @@ function compileJavaScript(filenameObj, options) {
 function compileStyles(config) {
 	log('compiling CSS...');
 
+	const autoprefixer = require('autoprefixer');
 	const mixins       = require('postcss-mixins');
 	const postcss      = require('postcss');
 	const CleanCSS     = require('clean-css');
@@ -357,7 +356,7 @@ function compileStyles(config) {
 		if (!excludeRE.test(filename)) {
 			css = `${mixinContent}\n${css}`;
 
-			const processed = postcss([mixins]).process(css, { from : filename });
+			const processed = postcss([mixins, autoprefixer]).process(css, { from : filename });
 
 			css = processed.css;
 
@@ -367,7 +366,7 @@ function compileStyles(config) {
 		if (!_opt.options.unminified) {
 			css = new CleanCSS({
 				level         : 1,
-				compatibility : '*'
+				compatibility : 'ie9'
 			})
 				.minify(css)
 				.styles;

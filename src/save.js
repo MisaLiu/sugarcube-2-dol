@@ -22,48 +22,12 @@ var Save = (() => { // eslint-disable-line no-unused-vars, no-var
 	// The upper bound of the saves slots.
 	let _slotsUBound = -1;
 
-	// extra save metadata
-	let _meta = {};
-
 	// Set of onLoad handlers.
 	const _onLoadHandlers = new Set();
 
 	// Set of onSave handlers.
 	const _onSaveHandlers = new Set();
 
-
-	/********************************
-		split save stuff
-	********************************/
-	let useSplit = () => Story.domId === 'free-cities'; // todo: make it a proper toggle
-	function indexGet() {
-		return storage.get('index') ?? savesObjCreate();
-	}
-
-	function splitSave(slot, data) {
-		storage.set(slot === 'autosave' ? slot : `slot${slot}`, data);
-		const index = indexGet();
-		delete data.state;
-		slot === 'autosave' ? index.autosave = data : index.slots[slot] = data;
-		try {
-			storage.set('index', index);
-		}
-		catch (ex) {
-			storage.delete(slot === 'autosave' ? 'autosave' : `slot${slot}`);
-			// eslint-disable-next-line no-alert
-			alert('Storage quota exceeded, try removing other saves first');
-		}
-
-		return true;
-	}
-
-	function splitDelete(slot) {
-		storage.delete(slot === 'autosave' ? slot : `slot${slot}`);
-		const index = indexGet();
-		slot === 'autosave' ? index.autosave = null : index.slots[slot] = null;
-		storage.set('index', index);
-		return true;
-	}
 
 	/*******************************************************************************************************************
 		Saves Functions.
@@ -408,7 +372,18 @@ var Save = (() => { // eslint-disable-line no-unused-vars, no-var
 				return;
 			}
 
-			deserialize(reader.result);
+			let saveObj;
+
+			try {
+				saveObj = JSON.parse(
+					/* legacy */ /\.json$/i.test(file.name) || /^\{/.test(reader.result)
+						? reader.result
+						: /* /legacy */ LZString.decompressFromBase64(reader.result)
+				);
+			}
+			catch (ex) { /* no-op; `_unmarshal()` will handle the error */ }
+
+			_unmarshal(saveObj);
 		});
 
 		// Initiate the file load.
@@ -582,11 +557,10 @@ var Save = (() => { // eslint-disable-line no-unused-vars, no-var
 			}
 
 			// Delta decode the state history and delete the encoded property.
-			if (!saveObj.state.history) {
-				if (saveObj.state.jdelta) delete saveObj.state.jdelta;
-				if (saveObj.state.delta) saveObj.state.history = State.deltaDecode(saveObj.state.delta);
-				delete saveObj.state.delta;
-			}
+			saveObj.state.history = State.deltaDecode(saveObj.state.delta);
+			delete saveObj.state.delta;
+
+			_onLoadHandlers.forEach(fn => fn(saveObj));
 
 			_onLoadHandlers.forEach(fn => fn(saveObj));
 
@@ -669,22 +643,19 @@ var Save = (() => { // eslint-disable-line no-unused-vars, no-var
 		*/
 		onLoad : {
 			value : Object.freeze(Object.defineProperties({}, {
-				add      : { value : onLoadAdd },
-				clear    : { value : onLoadClear },
-				delete   : { value : onLoadDelete },
-				size     : { get : onLoadSize },
-				handlers : { value : _onLoadHandlers }
+				add    : { value : onLoadAdd },
+				clear  : { value : onLoadClear },
+				delete : { value : onLoadDelete },
+				size   : { get : onLoadSize }
 			}))
 		},
 		onSave : {
 			value : Object.freeze(Object.defineProperties({}, {
-				add      : { value : onSaveAdd },
-				clear    : { value : onSaveClear },
-				delete   : { value : onSaveDelete },
-				size     : { get : onSaveSize },
-				handlers : { value : _onSaveHandlers }
+				add    : { value : onSaveAdd },
+				clear  : { value : onSaveClear },
+				delete : { value : onSaveDelete },
+				size   : { get : onSaveSize }
 			}))
-		},
-		meta : { get : () => _meta }
+		}
 	}));
 })();

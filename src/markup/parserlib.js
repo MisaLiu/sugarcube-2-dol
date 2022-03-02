@@ -1089,17 +1089,6 @@
 				$variable['property']
 				$variable[$indexOrPropertyVariable]
 
-			Added syntax examples:
-				- Method calls on properties:
-					$variable.toUpperCase()
-				- Optional chaining:
-					$variable?.property, $variable?.[index], $variable?.method($variable)
-				- Nested property access with function calls:
-					$variable.property.method(_temp)
-				- Indexed access followed by method calls:
-					$variable[0].method("str", 53)
-
-
 			NOTE: I really do not like how the initial bit of the regexp matches.
 		*/
 		name     : 'nakedVariable',
@@ -1107,32 +1096,19 @@
 		match    : `${Patterns.variable}(?:(?:\\??\\.${Patterns.identifier})|(?:${Patterns.insideParensRecursive})|(?:\\["(?:\\\\.|[^"\\\\])*"\\])|(?:\\['(?:\\\\.|[^'\\\\])*'\\]))*(?:\\((?:${Patterns.insideParensRecursive}|.*?)*\\))?`,
 
 		handler(w) {
-			const varExpression = w.matchText;
+			const result = State.getVar(w.matchText);
 
-			if (!varExpression.startsWith(Patterns.globalSigil)) {
-				const result = State.getVar(varExpression);
-				if (result == null) { // lazy equality for null
-					jQuery(document.createTextNode(w.matchText)).appendTo(w.output);
-				}
-				else {
-					new Wikifier(
-						(Config.debug
-							? new DebugView(w.output, 'variable', w.matchText, w.matchText) // Debug view setup.
-							: w
-						).output,
-						stringFrom(result)
-					);
-				}
-				return;
+			if (result == null) { // lazy equality for null
+				jQuery(document.createTextNode(w.matchText)).appendTo(w.output);
 			}
-
-			try {
-				const globalVar = varExpression.slice(1);
-				const result = Scripting.evalTwineScript(globalVar, w.output);
-				jQuery(document.createTextNode(result == null ? varExpression : stringFrom(result))).appendTo(w.output);
-			}
-			catch (ex) {
-				throwError(w.output, `Error evaluating ${Patterns.globalSigil} sigil: "${varExpression}": ${ex.message}`, w.source.slice(w.matchStart, w.nextMatch));
+			else {
+				new Wikifier(
+					(Config.debug
+						? new DebugView(w.output, 'variable', w.matchText, w.matchText) // Debug view setup.
+						: w
+					).output,
+					stringFrom(result)
+				);
 			}
 		}
 	});

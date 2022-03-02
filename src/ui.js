@@ -7,7 +7,7 @@
 
 ***********************************************************************************************************************/
 /*
-	global Alert, Browser, Config, Dialog, Engine, Has, L10n, Save, Setting, State, Story, Util, Wikifier, idb
+	global Alert, Browser, Config, Dialog, Engine, Has, L10n, Save, Setting, State, Story, Util, Wikifier,
 	       errorPrologRegExp, settings
 */
 

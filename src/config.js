@@ -24,8 +24,6 @@ var Config = (() => { // eslint-disable-line no-unused-vars, no-var
 	// State history settings.
 	let _historyControls  = true;
 	let _historyMaxStates = 40;
-	let _sessionMaxStates = 40;
-	let _expiredMaxStates = 100;
 
 	// Macros settings.
 	let _macrosIfAssignmentError   = true;
@@ -345,9 +343,6 @@ var Config = (() => { // eslint-disable-line no-unused-vars, no-var
 
 			get version() { return _savesVersion; },
 			set version(value) { _savesVersion = value; },
-
-			get useLZString() { return _savesUseLZString; },
-			set useLZString(value) { return _savesUseLZString = value; },
 
 			// legacy
 			// Die if deprecated saves onLoad handler getter is accessed.
