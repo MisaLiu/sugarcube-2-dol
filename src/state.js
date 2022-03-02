@@ -51,7 +51,7 @@ var State = (() => { // eslint-disable-line no-unused-vars, no-var
 		_active      = momentCreate();
 		_activeIndex = -1;
 		_expired     = [];
-		_prng        = _prng === null ? null : new PRNGWrapper(_prng.seed, false);
+		_prng        = _prng === null ? null : new PRNGWrapper(_prng.seed, { state : true });
 	}
 
 	/*
@@ -293,14 +293,12 @@ var State = (() => { // eslint-disable-line no-unused-vars, no-var
 
 		/*
 			Restore the seedable PRNG.
-
-			NOTE: We cannot simply set `_prng.pull` to `_active.pull` as that would
-			not properly mutate the PRNG's internal state.
 		*/
 		if (_prng !== null) {
 			_prng = PRNGWrapper.unmarshal({
-				seed : _prng.seed,
-				pull : _active.pull
+				seed  : _prng.seed,
+				pull  : _active.pull,
+				state : _active.prng || true
 			});
 		}
 
@@ -443,7 +441,9 @@ var State = (() => { // eslint-disable-line no-unused-vars, no-var
 		_history.push(momentCreate(title, _active.variables));
 
 		if (_prng) {
-			historyTop().pull = _prng.pull;
+			const top = historyTop();
+			top.pull = _prng.pull;
+			top.prng = _prng.state();
 		}
 
 		/*
@@ -561,7 +561,9 @@ var State = (() => { // eslint-disable-line no-unused-vars, no-var
 			throw new Error(`State.prng.init must be called during initialization, within either ${scriptSection} or the StoryInit special passage`);
 		}
 
-		_prng = new PRNGWrapper(seed, useEntropy);
+		/* Regenerate the PRNG object, then assign the state to the active moment. */
+		_prng = new PRNGWrapper(seed, { state : true, entropy : useEntropy });
+		_active.prng = _prng.state();
 		_active.pull = _prng.pull;
 	}
 
@@ -575,6 +577,10 @@ var State = (() => { // eslint-disable-line no-unused-vars, no-var
 
 	function prngSeed() {
 		return _prng ? _prng.seed : null;
+	}
+
+	function prngState() {
+		return _prng ? _prng.state() : null;
 	}
 
 	function prngRandom() {
@@ -762,7 +768,8 @@ var State = (() => { // eslint-disable-line no-unused-vars, no-var
 				init      : { value : prngInit },
 				isEnabled : { value : prngIsEnabled },
 				pull      : { get : prngPull },
-				seed      : { get : prngSeed }
+				seed      : { get : prngSeed },
+				state     : { get : prngState }
 			}))
 		},
 		random : { value : prngRandom },
