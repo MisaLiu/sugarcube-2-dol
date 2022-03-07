@@ -583,6 +583,23 @@ var State = (() => { // eslint-disable-line no-unused-vars, no-var
 		return _prng ? _prng.state() : null;
 	}
 
+	function prngPeek(count, callback = undefined) {
+		const values = [];
+		if (_prng) {
+			const state = _prng.state();
+			for (let i = 0; i < count; i++) {
+				if (typeof callback === 'function') {
+					values.push(callback(_prng.random()));
+				}
+				else {
+					values.push(_prng.random());
+				}
+			}
+			_prng = new PRNGWrapper(_prng.seed, { state });
+		}
+		return values;
+	}
+
 	function prngRandom() {
 		if (DEBUG) { console.log('[State/prngRandom()]'); }
 
@@ -769,7 +786,8 @@ var State = (() => { // eslint-disable-line no-unused-vars, no-var
 				isEnabled : { value : prngIsEnabled },
 				pull      : { get : prngPull },
 				seed      : { get : prngSeed },
-				state     : { get : prngState }
+				state     : { get : prngState },
+				peek      : { value : prngPeek }
 			}))
 		},
 		random : { value : prngRandom },
