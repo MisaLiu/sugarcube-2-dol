@@ -540,20 +540,10 @@ var Save = (() => { // eslint-disable-line no-unused-vars, no-var
 
 		_onSaveHandlers.forEach(fn => fn(saveObj, details));
 
-		// jsondiffpatch can not handle functions assigned to State.variables
-		// fall back to old delta format if any weirdness happens
-		try {
-			// write the oldest history frame to delta for compatibility with old versions, then code jdelta separately
-			saveObj.state.delta = [saveObj.state.history[0]];
-			saveObj.state.jdelta = State.jdeltaEncode(saveObj.state.history);
-			// save real index and fake it for compatibility
-			saveObj.state.realIndex = saveObj.state.index;
-			saveObj.state.index = 0;
-		}
-		catch {
-			alert('jdeltaEncode failed, falling back to old deltaEncode. Please, report to DoL discord, #bug-reports');
-			saveObj.state.delta = State.deltaEncode(saveObj.state.history);
-		}
+		// Delta encode the state history and delete the non-encoded property.
+		// // saveObj.state.delta = State.deltaEncode(saveObj.state.history);
+		// use jdelta instead
+		saveObj.state.jdelta = State.jdeltaEncode(saveObj.state.history);
 		delete saveObj.state.history;
 
 		return saveObj;
@@ -564,6 +554,10 @@ var Save = (() => { // eslint-disable-line no-unused-vars, no-var
 
 		try {
 			/* eslint-disable no-param-reassign */
+			/* legacy */
+			// Update saves with old/obsolete properties.
+			// _savesObjUpdate(saveObj);
+			/* /legacy */
 
 			if (!saveObj || !saveObj.hasOwnProperty('id') || !saveObj.hasOwnProperty('state')) {
 				throw new Error(L10n.get('errorSaveMissingData'));
@@ -571,29 +565,11 @@ var Save = (() => { // eslint-disable-line no-unused-vars, no-var
 
 			// Delta decode the state history and delete the encoded property.
 			if (!saveObj.state.history) {
-				if (saveObj.state.jdelta) {
-					let corruptionTrigger = false;
-					try {
-						saveObj.state.history = State.jdeltaDecode(saveObj.state.delta, saveObj.state.jdelta);
-						// ensure that decoder didn't screw up
-						if (saveObj.state.history.find(s => typeof s !== 'object')) corruptionTrigger = true;
-					}
-					catch {
-						corruptionTrigger = true;
-					}
-					if (corruptionTrigger) {
-						alert('Corrupted jdelta detected, loading the last known state. Please, report to DoL discord, #bug-reports');
-						saveObj.state.history = saveObj.state.delta;
-						delete saveObj.state.realIndex;
-					}
-					delete saveObj.state.jdelta;
-				}
-				else if (saveObj.state.delta) {
-					saveObj.state.history = State.deltaDecode(saveObj.state.delta);
-				}
+				if (saveObj.state.delta) saveObj.state.history = State.deltaDecode(saveObj.state.delta);
 				delete saveObj.state.delta;
+				if (saveObj.state.jdelta) saveObj.state.history = State.jdeltaDecode(saveObj.state.jdelta);
+				delete saveObj.state.jdelta;
 			}
-			if (saveObj.state.realIndex) saveObj.state.index = saveObj.state.realIndex;
 
 			_onLoadHandlers.forEach(fn => fn(saveObj));
 

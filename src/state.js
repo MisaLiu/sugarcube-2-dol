@@ -125,8 +125,7 @@ var State = (() => { // eslint-disable-line no-unused-vars, no-var
 	/*
 		Returns the current story state marshaled into a serializable object.
 	*/
-	function stateMarshal(noDelta = true, depth = Config.history.maxSessionStates) {
-		if (depth === 0) return null; // don't bother
+	function stateMarshal(noDelta = true) {
 		/*
 			Gather the properties.
 		*/
@@ -700,9 +699,11 @@ var State = (() => { // eslint-disable-line no-unused-vars, no-var
 		if (!Array.isArray(historyArr)) return null;
 		if (historyArr.length === 0) return [];
 
-		const jdelta = [];
+		const jdelta = [historyArr[0]];
+		const firstFrame = JSON.stringify(historyArr[0]);
+		// for speed and simplicity, only calculate delta between the first and target frame
 		for (let i = 1, iend = historyArr.length; i < iend; ++i) {
-			jdelta.push(jsondiffpatch.diff(historyArr[i - 1], historyArr[i]));
+			jdelta.push(jsondiffpatch.diff(firstFrame, JSON.stringify(historyArr[i])));
 		}
 
 		return jdelta;
@@ -714,15 +715,16 @@ var State = (() => { // eslint-disable-line no-unused-vars, no-var
 	 * @param {array} jdelta jsondiffpatch delta-encoded array
 	 * @returns {array}
 	 */
-	function historyjDeltaDecode(delta, jdelta) {
-		if (!Array.isArray(delta)) return null;
-		if (delta.length === 0) return [];
-		if (!jdelta) return delta;
+	function historyjDeltaDecode(jdelta) {
+		if (!Array.isArray(jdelta)) return null;
+		if (jdelta.length === 0) return [];
 
-		const historyArr = [clone(delta[0])];
+		const historyArr = [clone(jdelta[0])];
+		const state = JSON.stringify(jdelta[0]);
 
-		// jsondiffpatch.patch() modifies the first argument, cloning is necessary
-		for (const i in jdelta) historyArr.push(jsondiffpatch.patch(clone(historyArr[i]), jdelta[i]));
+		for (let i = 1, iend = jdelta.length; i < iend; ++i) {
+			historyArr.push(JSON.parse(jsondiffpatch.patch(state, jdelta[i])));
+		}
 
 		return historyArr;
 	}
