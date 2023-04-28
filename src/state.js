@@ -125,7 +125,8 @@ var State = (() => { // eslint-disable-line no-unused-vars, no-var
 	/*
 		Returns the current story state marshaled into a serializable object.
 	*/
-	function stateMarshal(noDelta = true) {
+	function stateMarshal(noDelta = true, depth = Config.history.maxSessionStates) {
+		if (depth === 0) return null; // don't bother
 		/*
 			Gather the properties.
 		*/
@@ -701,7 +702,7 @@ var State = (() => { // eslint-disable-line no-unused-vars, no-var
 
 		const jdelta = [];
 		for (let i = 1, iend = historyArr.length; i < iend; ++i) {
-			jdelta.push(jsondiffpatch.diff(JSON.stringify(historyArr[i - 1]), JSON.stringify(historyArr[i])));
+			jdelta.push(jsondiffpatch.diff(historyArr[i - 1], historyArr[i]));
 		}
 
 		return jdelta;
@@ -718,11 +719,10 @@ var State = (() => { // eslint-disable-line no-unused-vars, no-var
 		if (delta.length === 0) return [];
 		if (!jdelta) return delta;
 
-		const historyArr = delta;
+		const historyArr = [clone(delta[0])];
 
-		for (let i = 0, iend = jdelta.length; i < iend; ++i) {
-			historyArr.push(JSON.parse(jsondiffpatch.patch(JSON.stringify(historyArr[i]), jdelta[i])));
-		}
+		// jsondiffpatch.patch() modifies the first argument, cloning is necessary
+		for (const i in jdelta) historyArr.push(jsondiffpatch.patch(clone(historyArr[i]), jdelta[i]));
 
 		return historyArr;
 	}
