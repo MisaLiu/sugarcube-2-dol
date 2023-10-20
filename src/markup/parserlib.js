@@ -110,6 +110,29 @@
 		}
 	});
 
+	/*
+	Changes to the default macro parser with 3 things:
+	- Fixes an issue that causes tags that start with "end" to not get parsed, therefore not providing a payload.
+	- Adds support for object literals as macro arguments.
+		Extends the functionality to accept object literals directly, eliminating
+		the need to use template literals or other workarounds to pass complex data structures.
+
+		Also allows us to define arrow function inside object literals.
+
+		Example usage:
+		Before: <<macroName `{"key": "value"}`>>
+		After:  <<macroName {key:"value"}>>
+
+		Arrow function:  <<macroName {key: () => "returnvalue"}>>
+
+	- Adds support for function calls as macro arguments.
+		Extends the functionality to accept function calls anywhere in the argument list.
+		Before any function call was converted into a string.
+
+		Example usage:
+			<<macroName "arg1" myFunction("param") "arg3">>
+			<<macroName "arg1" myFunction("longer string") "arg3">>
+	*/
 	Wikifier.Parser.add({
 		name      : 'macro',
 		profiles  : ['core'],
@@ -198,7 +221,6 @@
 									this.context = this.context.parent;
 								}
 							}
-
 							/*
 								[DEPRECATED] Old-style/legacy macros.
 							*/
@@ -326,7 +348,7 @@
 					break;
 
 				default:
-					if (hasArgs && (tagName.startsWith('/') || tagName.startsWith('end'))) {
+					if (hasArgs && tagName.startsWith('/')) { // tags starting with 'end' used to have same treatment
 						// Skip over malformed alien closing tags.
 						this.lookahead.lastIndex = w.nextMatch = tagBegin + 2 + tagName.length;
 						continue;
@@ -405,11 +427,13 @@
 
 		parseArgs : (() => {
 			const Item = Lexer.enumFromNames([ // lex item types object (pseudo-enumeration)
-				'Error',        // error
-				'Bareword',     // bare identifier
-				'Expression',   // expression (backquoted)
-				'String',       // quoted string (single or double)
-				'SquareBracket' // [[…]] or [img[…]]
+				'Error',         // error
+				'Bareword',      // bare identifier
+				'Expression',    // expression (backquoted)
+				'String',        // quoted string (single or double)
+				'SquareBracket', // [[…]] or [img[…]]
+				'ObjectLiteral',
+				'FunctionCall'
 			]);
 			const spaceRe    = new RegExp(Patterns.space);
 			const notSpaceRe = new RegExp(Patterns.notSpace);
@@ -438,12 +462,40 @@
 					}
 					/* eslint-enable indent */
 				}
+				return lexer.pos;
+			}
 
+			function genericSlurp(lexer, openChar, closeChar, initCount) {
+				let count = initCount;
+
+				loop: for (;;) {
+					const ch = lexer.next();
+
+					switch (ch) {
+					case openChar:
+						count++;
+						break;
+
+					case closeChar:
+						count--;
+
+						if (count === 0) {
+							break loop;
+						}
+
+						break;
+
+					case EOF:
+					case '\n':
+						return false;
+					}
+				}
 				return lexer.pos;
 			}
 
 			function lexSpace(lexer) {
 				const offset = lexer.source.slice(lexer.pos).search(notSpaceRe);
+				let remainingStr = lexer.source.slice(lexer.pos); // Capture the remaining part of the string for lookahead
 
 				if (offset === EOF) {
 					// no non-whitespace characters, so bail
@@ -452,6 +504,13 @@
 				else if (offset !== 0) {
 					lexer.pos += offset;
 					lexer.ignore();
+					remainingStr = lexer.source.slice(lexer.pos); // Update remainingStr after skipping spaces
+				}
+
+				// Check if the next token looks like a function call
+				if (/^[a-zA-Z_$][0-9a-zA-Z_$]*\s*\(/.test(remainingStr)) {
+					lexer.next(); // Advance the lexer's position to skip the first character of the function name
+					return lexFunctionCall;
 				}
 
 				// determine what the next state is
@@ -464,6 +523,8 @@
 					return lexSingleQuote;
 				case '[':
 					return lexSquareBracket;
+				case '{':
+					return lexObjectLiteral;
 				default:
 					return lexBareword;
 				}
@@ -512,48 +573,29 @@
 					return lexer.error(Item.Error, `malformed ${what} markup`);
 				}
 
-				lexer.depth = 2; // account for both initial left square brackets
-
-				loop: for (;;) {
-					/* eslint-disable indent */
-					switch (lexer.next()) {
-					case '\\':
-						{
-							const ch = lexer.next();
-
-							if (ch !== EOF && ch !== '\n') {
-								break;
-							}
-						}
-						/* falls through */
-					case EOF:
-					case '\n':
-						return lexer.error(Item.Error, `unterminated ${what} markup`);
-
-					case '[':
-						++lexer.depth;
-						break;
-
-					case ']':
-						--lexer.depth;
-
-						if (lexer.depth < 0) {
-							return lexer.error(Item.Error, "unexpected right square bracket ']'");
-						}
-
-						if (lexer.depth === 1) {
-							if (lexer.next() === ']') {
-								--lexer.depth;
-								break loop;
-							}
-							lexer.backup();
-						}
-						break;
-					}
-					/* eslint-enable indent */
+				// Initial depth is 2 to account for double brackets [[
+				if (genericSlurp(lexer, '[', ']', 2) === EOF) {
+					return lexer.error(Item.Error, `unterminated ${what} markup`);
 				}
 
 				lexer.emit(Item.SquareBracket);
+				return lexSpace;
+			}
+
+			function lexObjectLiteral(lexer) {
+				if (genericSlurp(lexer, '{', '}', 1) === EOF) {
+					return lexer.error(Item.Error, 'unterminated object literal');
+				}
+
+				lexer.emit(Item.ObjectLiteral);
+				return lexSpace;
+			}
+
+			function lexFunctionCall(lexer) {
+				if (genericSlurp(lexer, '(', ')', 0) === EOF) {
+					return lexer.error(Item.Error, 'unterminated function call');
+				}
+				lexer.emit(Item.FunctionCall);
 				return lexSpace;
 			}
 
@@ -583,7 +625,6 @@
 						if (varTest.test(arg)) {
 							arg = State.getVar(arg);
 						}
-
 						// Property access on the settings or setup objects, so try to evaluate it.
 						else if (/^(?:settings|setup)[.[]/.test(arg)) {
 							try {
@@ -730,6 +771,22 @@
 							}
 						}
 						break;
+					case Item.ObjectLiteral:
+						try {
+							arg = Scripting.evalTwineScript(`(${arg})`);
+						}
+						catch (ex) {
+							throw new Error(`unable to parse macro argument object literal "${arg}": ${ex.message}`);
+						}
+						break;
+					case Item.FunctionCall:
+						try {
+							arg = Scripting.evalTwineScript(arg);
+						}
+						catch (ex) {
+							throw new Error(`unable to parse macro argument "${arg}": ${ex.message}`);
+						}
+						break;
 					}
 
 					args.push(arg);
@@ -741,6 +798,7 @@
 			return parseMacroArgs;
 		})()
 	});
+
 
 	Wikifier.Parser.add({
 		name     : 'link',
