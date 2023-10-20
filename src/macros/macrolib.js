@@ -1044,6 +1044,8 @@
 				}
 
 				while (evalJavaScript(condition)) {
+					if (Wikifier.stopWikify) return;
+
 					if (--safety < 0) {
 						return this.error(`exceeded configured maximum loop iterations (${Config.macros.maxLoopIterations})`);
 					}
@@ -3856,6 +3858,15 @@
 			catch (ex) {
 				return this.error(`cannot create widget macro "${widgetName}": ${ex.message}`);
 			}
+		}
+	});
+
+	/*
+		<<exit>> & <<exitAll>>
+	*/
+	Macro.add(['exit', 'exitAll'], {
+		handler() {
+			Wikifier.stopWikify = this.name === 'exit' ? 1 : 2;
 		}
 	});
 })();
