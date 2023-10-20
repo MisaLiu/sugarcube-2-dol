@@ -118,7 +118,7 @@
 		the need to use template literals or other workarounds to pass complex data structures.
 
 		Also allows us to define arrow function inside object literals.
-
+		
 		Example usage:
 		Before: <<macroName `{"key": "value"}`>>
 		After:  <<macroName {key:"value"}>>
@@ -137,21 +137,24 @@
 		name      : 'macro',
 		profiles  : ['core'],
 		match     : '<<',
-		lookahead : new RegExp(`<<(/?${Patterns.macroName})(?:\\s*)((?:(?:/\\*[^*]*\\*+(?:[^/*][^*]*\\*+)*/)|(?://.*\\n)|(?:\`(?:\\\\.|[^\`\\\\])*\`)|(?:"(?:\\\\.|[^"\\\\])*")|(?:'(?:\\\\.|[^'\\\\])*')|(?:\\[(?:[<>]?[Ii][Mm][Gg])?\\[[^\\r\\n]*?\\]\\]+)|[^>]|(?:>(?!>)))*)>>`, 'gm'),
-		working   : { source : '', name : '', arguments : '', index : 0 }, // the working parse object
-		context   : null, // last execution context object (top-level macros, hierarchically, have a null context)
+		lookahead : new RegExp(
+			`<<(/?${Patterns.macroName})(?:\\s*)((?:(?:/\\*[^*]*\\*+(?:[^/*][^*]*\\*+)*/)|(?://.*\\n)|(?:\`(?:\\\\.|[^\`\\\\])*\`)|(?:"(?:\\\\.|[^"\\\\])*")|(?:'(?:\\\\.|[^'\\\\])*')|(?:\\[(?:[<>]?[Ii][Mm][Gg])?\\[[^\\r\\n]*?\\]\\]+)|[^>]|(?:>(?!>)))*)>>`,
+			'gm'
+		),
+		working : { source : '', name : '', arguments : '', index : 0 }, // the working parse object
+		context : null, // last execution context object (top-level macros, hierarchically, have a null context)
 
 		handler(w) {
-			const matchStart = this.lookahead.lastIndex = w.matchStart;
+			const matchStart = (this.lookahead.lastIndex = w.matchStart);
 
 			if (this.parseTag(w)) {
-				/*
-					If `parseBody()` is called below, it will modify the current working
-					values, so we must cache them now.
-				*/
+			/*
+				If `parseBody()` is called below, it will modify the current working
+				values, so we must cache them now.
+			*/
 				const nextMatch = w.nextMatch;
-				const name      = this.working.name;
-				const rawArgs   = this.working.arguments;
+				const name = this.working.name;
+				const rawArgs = this.working.arguments;
 				let macro;
 
 				try {
@@ -165,11 +168,7 @@
 
 							if (!payload) {
 								w.nextMatch = nextMatch; // we must reset `w.nextMatch` here, as `parseBody()` modifies it
-								return throwError(
-									w.output,
-									`cannot find a closing tag for macro <<${name}>>`,
-									`${w.source.slice(matchStart, w.nextMatch)}\u2026`
-								);
+								return throwError(w.output, `cannot find a closing tag for macro <<${name}>>`, `${w.source.slice(matchStart, w.nextMatch)}\u2026`);
 							}
 						}
 
@@ -179,12 +178,12 @@
 								: payload[0].args;
 
 							/*
-								New-style macros.
-							*/
+							New-style macros.
+						*/
 							if (typeof macro._MACRO_API !== 'undefined') {
-								/*
-									Add the macro's execution context to the context chain.
-								*/
+							/*
+								Add the macro's execution context to the context chain.
+							*/
 								this.context = new MacroContext({
 									macro,
 									name,
@@ -196,22 +195,22 @@
 								});
 
 								/*
-									Call the handler.
+								Call the handler.
 
-									NOTE: There's no catch clause here because this try/finally exists solely
-									to ensure that the execution context is properly restored in the event
-									that an uncaught exception is thrown during the handler call.
-								*/
+								NOTE: There's no catch clause here because this try/finally exists solely
+								to ensure that the execution context is properly restored in the event
+								that an uncaught exception is thrown during the handler call.
+							*/
 								try {
 									macro.handler.call(this.context);
-									/*
-										QUESTION: Swap to the following, which passes macro arguments in
-										as parameters to the handler function, in addition to them being
-										available on its `this`?  If so, it might still be something to
-										hold off on until v3, when the legacy macro API is removed.
+								/*
+									QUESTION: Swap to the following, which passes macro arguments in
+									as parameters to the handler function, in addition to them being
+									available on its `this`?  If so, it might still be something to
+									hold off on until v3, when the legacy macro API is removed.
 
-										macro.handler.apply(this.context, this.context.args);
-									*/
+									macro.handler.apply(this.context, this.context.args);
+								*/
 								}
 								finally {
 									// eslint-disable-next-line max-depth
@@ -221,23 +220,23 @@
 									this.context = this.context.parent;
 								}
 							}
-							/*
-								[DEPRECATED] Old-style/legacy macros.
-							*/
 							else {
+							/*
+							[DEPRECATED] Old-style/legacy macros.
+						*/
 								/*
-									Set up the raw arguments string.
-								*/
+								Set up the raw arguments string.
+							*/
 								const prevRawArgs = w._rawArgs;
 								w._rawArgs = rawArgs;
 
 								/*
-									Call the handler.
+								Call the handler.
 
-									NOTE: There's no catch clause here because this try/finally exists solely
-									to ensure that the previous raw arguments string is properly restored in
-									the event that an uncaught exception is thrown during the handler call.
-								*/
+								NOTE: There's no catch clause here because this try/finally exists solely
+								to ensure that the previous raw arguments string is properly restored in
+								the event that an uncaught exception is thrown during the handler call.
+							*/
 								try {
 									macro.handler(w.output, name, args, w, payload);
 								}
@@ -263,11 +262,7 @@
 						);
 					}
 					else {
-						return throwError(
-							w.output,
-							`macro <<${name}>> does not exist`,
-							w.source.slice(matchStart, w.nextMatch)
-						);
+						return throwError(w.output, `macro <<${name}>> does not exist`, w.source.slice(matchStart, w.nextMatch));
 					}
 				}
 				catch (ex) {
@@ -278,10 +273,10 @@
 					);
 				}
 				finally {
-					this.working.source    = '';
-					this.working.name      = '';
+					this.working.source = '';
+					this.working.name = '';
 					this.working.arguments = '';
-					this.working.index     = 0;
+					this.working.index = 0;
 				}
 			}
 			else {
@@ -295,10 +290,10 @@
 			if (match && match.index === w.matchStart && match[1]) {
 				w.nextMatch = this.lookahead.lastIndex;
 
-				this.working.source    = w.source.slice(match.index, this.lookahead.lastIndex);
-				this.working.name      = match[1];
+				this.working.source = w.source.slice(match.index, this.lookahead.lastIndex);
+				this.working.name = match[1];
 				this.working.arguments = match[2];
-				this.working.index     = match.index;
+				this.working.index = match.index;
 
 				return true;
 			}
@@ -307,16 +302,16 @@
 		},
 
 		parseBody(w, macro) {
-			const openTag  = this.working.name;
+			const openTag = this.working.name;
 			const closeTag = `/${openTag}`;
 			const closeAlt = `end${openTag}`;
 			const bodyTags = Array.isArray(macro.tags) ? macro.tags : false;
-			const payload  = [];
-			let end          = -1;
-			let opened       = 1;
-			let curSource    = this.working.source;
-			let curTag       = this.working.name;
-			let curArgument  = this.working.arguments;
+			const payload = [];
+			let end = -1;
+			let opened = 1;
+			let curSource = this.working.source;
+			let curTag = this.working.name;
+			let curArgument = this.working.arguments;
 			let contentStart = w.nextMatch;
 
 			while ((w.matchStart = w.source.indexOf(this.match, w.nextMatch)) !== -1) {
@@ -326,11 +321,11 @@
 				}
 
 				const tagSource = this.working.source;
-				const tagName   = this.working.name;
-				const tagArgs   = this.working.arguments;
-				const tagBegin  = this.working.index;
-				const tagEnd    = w.nextMatch;
-				const hasArgs   = tagArgs.trim() !== '';
+				const tagName = this.working.name;
+				const tagArgs = this.working.arguments;
+				const tagBegin = this.working.index;
+				const tagEnd = w.nextMatch;
+				const hasArgs = tagArgs.trim() !== '';
 
 				switch (tagName) {
 				case openTag:
@@ -348,7 +343,7 @@
 					break;
 
 				default:
-					if (hasArgs && tagName.startsWith('/')) { // tags starting with 'end' used to have same treatment
+					if (hasArgs && tagName.startsWith('/')) {
 						// Skip over malformed alien closing tags.
 						this.lookahead.lastIndex = w.nextMatch = tagBegin + 2 + tagName.length;
 						continue;
@@ -363,9 +358,9 @@
 									args      : this.createArgs(curArgument, this.skipArgs(macro, curTag)),
 									contents  : w.source.slice(contentStart, tagBegin)
 								});
-								curSource    = tagSource;
-								curTag       = tagName;
-								curArgument  = tagArgs;
+								curSource = tagSource;
+								curTag = tagName;
+								curArgument = tagArgs;
 								contentStart = tagEnd;
 							}
 						}
@@ -404,7 +399,7 @@
 				},
 				full : {
 					value : Scripting.parse(rawArgsString)
-				}
+				},
 			});
 
 			return args;
@@ -414,10 +409,10 @@
 			if (typeof macro.skipArgs !== 'undefined') {
 				const sa = macro.skipArgs;
 
-				return typeof sa === 'boolean' && sa || Array.isArray(sa) && sa.includes(tagName);
+				return (typeof sa === 'boolean' && sa) || (Array.isArray(sa) && sa.includes(tagName));
 			}
-			/* legacy */
 			else if (typeof macro.skipArg0 !== 'undefined') {
+			/* legacy */
 				return macro.skipArg0 && macro.name === tagName;
 			}
 			/* /legacy */
@@ -426,41 +421,70 @@
 		},
 
 		parseArgs : (() => {
-			const Item = Lexer.enumFromNames([ // lex item types object (pseudo-enumeration)
-				'Error',         // error
-				'Bareword',      // bare identifier
-				'Expression',    // expression (backquoted)
-				'String',        // quoted string (single or double)
+			const Item = Lexer.enumFromNames([
+			// lex item types object (pseudo-enumeration)
+				'Error', // error
+				'Bareword', // bare identifier
+				'Expression', // expression (backquoted)
+				'String', // quoted string (single or double)
 				'SquareBracket', // [[…]] or [img[…]]
 				'ObjectLiteral',
 				'FunctionCall'
 			]);
-			const spaceRe    = new RegExp(Patterns.space);
+			const spaceRe = new RegExp(Patterns.space);
 			const notSpaceRe = new RegExp(Patterns.notSpace);
-			const varTest    = new RegExp(`^${Patterns.variable}`);
+			const varTest = new RegExp(`^${Patterns.variable}`);
 
 			// Lexing functions.
 			function slurpQuote(lexer, endQuote) {
 				loop: for (;;) {
-					/* eslint-disable indent */
-					switch (lexer.next()) {
-					case '\\':
-						{
-							const ch = lexer.next();
+				/* eslint-disable indent */
+				switch (lexer.next()) {
+					case '\\': {
+						const ch = lexer.next();
 
-							if (ch !== EOF && ch !== '\n') {
-								break;
-							}
+						if (ch !== EOF && ch !== '\n') {
+							break;
 						}
-						/* falls through */
+					}
+					/* falls through */
 					case EOF:
 					case '\n':
 						return EOF;
 
 					case endQuote:
 						break loop;
+				}
+				/* eslint-enable indent */
+				}
+
+				return lexer.pos;
+			}
+
+			function genericSlurp(lexer, openChar, closeChar, initCount) {
+				let count = initCount;
+
+				loop: for (;;) {
+					const ch = lexer.next();
+
+					switch (ch) {
+					case openChar:
+						count++;
+						break;
+
+					case closeChar:
+						count--;
+
+						if (count === 0) {
+							break loop;
+						}
+
+						break;
+
+					case EOF:
+					case '\n':
+						return false;
 					}
-					/* eslint-enable indent */
 				}
 				return lexer.pos;
 			}
@@ -498,7 +522,7 @@
 				let remainingStr = lexer.source.slice(lexer.pos); // Capture the remaining part of the string for lookahead
 
 				if (offset === EOF) {
-					// no non-whitespace characters, so bail
+				// no non-whitespace characters, so bail
 					return null;
 				}
 				else if (offset !== 0) {
@@ -608,9 +632,9 @@
 
 			// Parse function.
 			function parseMacroArgs(rawArgsString) {
-				// Initialize the lexer.
+			// Initialize the lexer.
 				const lexer = new Lexer(rawArgsString, lexSpace);
-				const args  = [];
+				const args = [];
 
 				// Lex the raw argument string.
 				lexer.run().forEach(item => {
@@ -682,10 +706,10 @@
 						else {
 							try {
 								/*
-									The enclosing parenthesis here are necessary to force a code string
-									consisting solely of an object literal to be evaluated as such, rather
-									than as a code block.
-								*/
+								The enclosing parenthesis here are necessary to force a code string
+								consisting solely of an object literal to be evaluated as such, rather
+								than as a code block.
+							*/
 								arg = Scripting.evalTwineScript(`(${arg})`);
 							}
 							catch (ex) {
@@ -716,18 +740,20 @@
 							}
 
 							if (markup.pos < arg.length) {
-								throw new Error(`unable to parse macro argument "${arg}": unexpected character(s) "${arg.slice(markup.pos)}" (pos: ${markup.pos})`);
+								throw new Error(
+									`unable to parse macro argument "${arg}": unexpected character(s) "${arg.slice(markup.pos)}" (pos: ${markup.pos})`
+								);
 							}
 
 							// Convert to a link or image object.
 							if (markup.isLink) {
 								// .isLink, [.text], [.forceInternal], .link, [.setter]
 								arg = { isLink : true };
-								arg.count    = markup.hasOwnProperty('text') ? 2 : 1;
-								arg.link     = Wikifier.helpers.evalPassageId(markup.link);
-								arg.text     = markup.hasOwnProperty('text') ? Wikifier.helpers.evalText(markup.text) : arg.link;
+								arg.count = markup.hasOwnProperty('text') ? 2 : 1;
+								arg.link = Wikifier.helpers.evalPassageId(markup.link);
+								arg.text = markup.hasOwnProperty('text') ? Wikifier.helpers.evalText(markup.text) : arg.link;
 								arg.external = !markup.forceInternal && Wikifier.isExternalLink(arg.link);
-								arg.setFn    = markup.hasOwnProperty('setter')
+								arg.setFn = markup.hasOwnProperty('setter')
 									? Wikifier.helpers.createShadowSetterCallback(Scripting.parse(markup.setter))
 									: null;
 							}
@@ -744,7 +770,7 @@
 										const passage = Story.get(source);
 
 										if (passage.tags.includes('Twine.image')) {
-											imgObj.source  = passage.text;
+											imgObj.source = passage.text;
 											imgObj.passage = passage.title;
 										}
 									}
@@ -761,7 +787,7 @@
 								}
 
 								if (markup.hasOwnProperty('link')) {
-									arg.link     = Wikifier.helpers.evalPassageId(markup.link);
+									arg.link = Wikifier.helpers.evalPassageId(markup.link);
 									arg.external = !markup.forceInternal && Wikifier.isExternalLink(arg.link);
 								}
 
