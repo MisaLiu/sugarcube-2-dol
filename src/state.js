@@ -125,29 +125,41 @@ var State = (() => { // eslint-disable-line no-unused-vars, no-var
 	/*
 		Returns the current story state marshaled into a serializable object.
 	*/
-	function stateMarshal(noDelta = false, depth = Config.history.maxSessionStates, useClone = false) {
+	function stateMarshal(noDelta = true, depth = Config.history.maxSessionStates) {
 		if (depth === 0) return null; // don't bother
 		/*
 			Gather the properties.
 		*/
-		const stateObj = {
-			index   : _activeIndex,
-			history : useClone ? clone(_history) : _history
-		};
 
-		if (_history.length > depth) reduceHistorySize(stateObj, depth);
-		if (!noDelta) {
-			stateObj.delta = historyDeltaEncode(stateObj.history);
-			delete stateObj.history;
-		}
+		const stateObj = { index : _activeIndex };
+		const hsize = _history.length; // how many frames are currently in the history
+		let history = [];
+		if (depth === 1) { history = [clone(_history[_activeIndex])]; stateObj.index = 0; }
+		else if (depth >= hsize) history = clone(_history);
+		else { // fuck.gif
+			// pick up which frames to preserve, aiming at preserving the frames both before and after the active one
+			const ssize = Math.min(depth, hsize); // how many frames will go into session (s for session)
+			const hindex = _activeIndex; // how far away active index is from the oldest history element (h for history)
+			const iindex = hsize - 1 - _activeIndex; // same but from the newest element (i for inverted)
+			let sindex = 0; // index to start copying frames from
+			const sradius = Math.floor(ssize / 2); // how many frames can we cover on both sides from active frame
+			if (hindex < iindex) { // active index is closer to the left side of the history array
+				if (sradius >= hindex) sindex = 0; // there's enough space to include the oldest frame
+				else sindex = hindex - sradius; // starting index will extend into the past as much as the radius will allow
+			}
+			else { // active index is closer to the right side
+				if (sradius >= iindex) sindex = hsize - ssize; // enough space to include the newest frame
+				else sindex = hindex - sradius;
+			}
 
-		if (_expired.length > 0) {
-			stateObj.expired = [..._expired];
+			stateObj.index -= sindex; // offset the marshalled index by the starting index
+			for (let i = sindex; i < sindex + ssize; i++) history.push(clone(_history[i]));
 		}
+		if (noDelta) stateObj.history = history;
+		else stateObj.delta = historyDeltaEncode(history);
 
-		if (_prng !== null || _prng.hasOwnProperty('seed')) {
-			stateObj.seed = _prng.seed;
-		}
+		if (_expired.length > 0) stateObj.expired = [..._expired];
+		if (_prng !== null || _prng.hasOwnProperty('seed')) stateObj.seed = _prng.seed;
 
 		return stateObj;
 	}
@@ -155,14 +167,23 @@ var State = (() => { // eslint-disable-line no-unused-vars, no-var
 	/*
 		Restores the story state from a marshaled story state serialization object.
 	*/
-	function stateUnmarshal(stateObj, type) {
-		if (stateObj == null) throw new Error('state object is null or undefined');
+	function stateUnmarshal(stateObj, noDelta = true) {
+		if (stateObj == null) { // lazy equality for null
+			throw new Error('state object is null or undefined');
+		}
 
-		if (
-			   !stateObj.hasOwnProperty(noDelta ? 'history' : 'delta')
-			|| stateObj[noDelta ? 'history' : 'delta'].length === 0
-		) {
-			throw new Error('state object has no history or history is empty');
+		if (!stateObj.hasOwnProperty(noDelta ? 'history' : 'delta') || stateObj[noDelta ? 'history' : 'delta'].length === 0) {
+			if (stateObj.hasOwnProperty('delta')) {
+				console.log("warning: stateObj is delta-encoded when it shouldn't be");
+				noDelta = false;
+			}
+			else if (stateObj.hasOwnProperty('history')) {
+				console.log('warning: stateObj is not delta-encoded when it should be');
+				noDelta = true;
+			}
+			else {
+				throw new Error('state object has no history or history is empty');
+			}
 		}
 
 		if (!stateObj.hasOwnProperty('index')) {
@@ -196,8 +217,8 @@ var State = (() => { // eslint-disable-line no-unused-vars, no-var
 	/*
 		Returns the current story state marshaled into a save-compatible serializable object.
 	*/
-	function stateMarshalForSave(depth = 100, noDelta = true) {
-		return stateMarshal(noDelta, depth, true);
+	function stateMarshalForSave(depth = 100) {
+		return stateMarshal(true, depth);
 	}
 
 	/*
@@ -386,6 +407,26 @@ var State = (() => { // eslint-disable-line no-unused-vars, no-var
 				pull: _active.pull,
 				state: _active.prng || true
 			});
+		}
+
+		/*
+			Update the active session.
+		*/
+		let pass = false;
+		while (Config.history.maxSessionStates > 0 && !pass) {
+			try {
+				session.set('state', stateMarshal());
+				pass = true;
+			}
+			catch { // maxSessionStates is too high to fit sessionStorage
+				console.log('session.set error, reducing maxSessionStates');
+				if (Config.history.maxSessionStates > State.history.length) Config.history.maxSessionStates = State.history.length;
+				Config.history.maxSessionStates--;
+				if (window.Errors) { // call dol-specific errors reporter if available
+					window.Errors.report(`Save data is too big for current history depth setting. It's value was auto-adjusted to ${Config.history.maxSessionStates}`);
+					if (window.V && window.V.options) window.V.options.maxStates = Config.history.maxSessionStates; // and limit history depth as well
+				}
+			}
 		}
 
 		/*
@@ -648,6 +689,44 @@ var State = (() => { // eslint-disable-line no-unused-vars, no-var
 		return historyArr;
 	}
 
+	/**
+	 * encodes history array with jsondiffpatch delta, as default diff has
+	 * no mechanism for finding changes in objects and arrays.
+	 *
+	 * @param {array} historyArr
+	 * @returns {array} jdelta
+	 */
+	function historyjDeltaEncode(historyArr) {
+		if (!Array.isArray(historyArr)) return null;
+		if (historyArr.length === 0) return [];
+
+		const jdelta = [];
+		for (let i = 1, iend = historyArr.length; i < iend; ++i) {
+			jdelta.push(jsondiffpatch.diff(historyArr[i - 1], historyArr[i]));
+		}
+
+		return jdelta;
+	}
+
+	/**
+	 * restores history array from jdelta
+	 *
+	 * @param {array} jdelta jsondiffpatch delta-encoded array
+	 * @returns {array}
+	 */
+	function historyjDeltaDecode(delta, jdelta) {
+		if (!Array.isArray(delta)) return null;
+		if (delta.length === 0) return [];
+		if (!jdelta) return delta;
+
+		const historyArr = [clone(delta[0])];
+
+		// jsondiffpatch.patch() modifies the first argument, cloning is necessary
+		for (const i in jdelta) historyArr.push(jsondiffpatch.patch(clone(historyArr[i]), jdelta[i]));
+
+		return historyArr;
+	}
+
 
 	/*******************************************************************************************************************
 		PRNG Functions.
@@ -900,6 +979,8 @@ var State = (() => { // eslint-disable-line no-unused-vars, no-var
 		go          : { value : historyGo },
 		deltaEncode : { value : historyDeltaEncode },
 		deltaDecode : { value : historyDeltaDecode },
+		jdeltaEncode: { value : historyjDeltaEncode },
+		jdeltaDecode: { value : historyjDeltaDecode },
 
 		/*
 			PRNG Functions.

@@ -24,6 +24,7 @@ var Config = (() => { // eslint-disable-line no-unused-vars, no-var
 	// State history settings.
 	let _historyControls  = true;
 	let _historyMaxStates = 40;
+	let _sessionMaxStates = 40;
 
 	// Macros settings.
 	let _macrosIfAssignmentError   = true;
@@ -143,11 +144,6 @@ var Config = (() => { // eslint-disable-line no-unused-vars, no-var
 				}
 
 				_sessionMaxStates = value;
-			},
-
-			get maxExpired() { return _expiredMaxStates; },
-			set maxExpired(value) {
-				_expiredMaxStates = value;
 			},
 
 			// legacy

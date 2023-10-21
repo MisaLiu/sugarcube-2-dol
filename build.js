@@ -94,6 +94,7 @@ const CONFIG = {
 	libs : [
 		// The ordering herein is significant.
 		'src/vendor/classList.min.js',
+		'src/vendor/jsondiffpatch.umd.min.js',
 		'src/vendor/jquery.min.js',
 		'src/vendor/jquery.ba-throttle-debounce.min.js',
 		'src/vendor/imagesloaded.pkgd.min.js',
