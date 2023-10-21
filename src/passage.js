@@ -186,9 +186,6 @@ var Passage = (() => { // eslint-disable-line no-unused-vars, no-var
 				return `[img[${this.text}]]`;
 			}
 
-			// Reset exit flag at the start of a passage
-			Wikifier.stopWikify = false;
-
 			let processed = this.text;
 
 			// Handle `Config.passages.onProcess`.
