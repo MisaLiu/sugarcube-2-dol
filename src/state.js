@@ -11,6 +11,8 @@
 var State = (() => { // eslint-disable-line no-unused-vars, no-var
 	'use strict';
 
+	const _definedProperties = {};
+
 	// History moment stack.
 	let _history = [];
 
@@ -55,7 +57,7 @@ var State = (() => { // eslint-disable-line no-unused-vars, no-var
 		_expired     = [];
 		/* Have the PRNG object return a copy of the original.
 			Old: _prng = _prng === null ? null : new PRNGWrapper(_prng.seed, false); */
-		_prng        = _prng === null ? null : new PRNGWrapper(_prng.seed, { state: true });
+		_prng        = _prng === null ? null : new PRNGWrapper(_prng.seed, { state : true });
 	}
 
 	/*
@@ -125,7 +127,7 @@ var State = (() => { // eslint-disable-line no-unused-vars, no-var
 	/*
 		Returns the current story state marshaled into a serializable object.
 	*/
-	function stateMarshal(noDelta = true, depth = Config.history.maxSessionStates) {
+	function stateMarshal(noDelta = true, depth = Config.history.maxSessionStates, useClone = false) {
 		if (depth === 0) return null; // don't bother
 		/*
 			Gather the properties.
@@ -134,8 +136,11 @@ var State = (() => { // eslint-disable-line no-unused-vars, no-var
 		const stateObj = { index : _activeIndex };
 		const hsize = _history.length; // how many frames are currently in the history
 		let history = [];
-		if (depth === 1) { history = [clone(_history[_activeIndex])]; stateObj.index = 0; }
-		else if (depth >= hsize) history = clone(_history);
+		if (depth === 1 || hsize === 1) {
+			history = [useClone ? clone(_history[_activeIndex]) : _history[_activeIndex]];
+			stateObj.index = 0;
+		}
+		else if (depth >= hsize) history = useClone ? clone(_history) : _history;
 		else { // fuck.gif
 			// pick up which frames to preserve, aiming at preserving the frames both before and after the active one
 			const ssize = Math.min(depth, hsize); // how many frames will go into session (s for session)
@@ -159,7 +164,7 @@ var State = (() => { // eslint-disable-line no-unused-vars, no-var
 		else stateObj.delta = historyDeltaEncode(history);
 
 		if (_expired.length > 0) stateObj.expired = [..._expired];
-		if (_prng !== null || _prng.hasOwnProperty('seed')) stateObj.seed = _prng.seed;
+		if (_prng !== null && _prng.hasOwnProperty('seed')) stateObj.seed = _prng.seed;
 
 		return stateObj;
 	}
@@ -167,7 +172,8 @@ var State = (() => { // eslint-disable-line no-unused-vars, no-var
 	/*
 		Restores the story state from a marshaled story state serialization object.
 	*/
-	function stateUnmarshal(stateObj, noDelta = true) {
+	function stateUnmarshal(stateObj, noDeltaFlag = true) {
+		let noDelta = noDeltaFlag;
 		if (stateObj == null) { // lazy equality for null
 			throw new Error('state object is null or undefined');
 		}
@@ -217,8 +223,8 @@ var State = (() => { // eslint-disable-line no-unused-vars, no-var
 	/*
 		Returns the current story state marshaled into a save-compatible serializable object.
 	*/
-	function stateMarshalForSave(depth = 100) {
-		return stateMarshal(true, depth);
+	function stateMarshalForSave(depth = 100, noDelta = true) {
+		return stateMarshal(noDelta, depth, true);
 	}
 
 	/*
@@ -273,8 +279,8 @@ var State = (() => { // eslint-disable-line no-unused-vars, no-var
 	function getSessionState() {
 		if (Config.history.maxSessionStates === 0) return;
 
-		const sessionState = session.get('state');
-		if (sessionState?.hasOwnProperty('delta')) {
+		const sessionState = session.get("state");
+		if (Object.hasOwn(sessionState, "delta")) {
 			sessionState.history = State.deltaDecode(sessionState.delta);
 			delete sessionState.delta;
 		}
@@ -288,31 +294,32 @@ var State = (() => { // eslint-disable-line no-unused-vars, no-var
 	 * @param {object} sessionState decoded session state
 	 */
 	function setSessionState(sessionState) {
-		if (!sessionState || !sessionState.history) throw new Error('setSessionState error: not a valid sessionState object');
+		if (!sessionState || !sessionState.history) throw new Error("setSessionState error: not a valid sessionState object");
 		let pass = false;
 		let sstates = Config.history.maxSessionStates;
 		if (sstates === 0) return pass;
 
 		try {
 			// if history is bigger than session states limit, reduce the history to match
-			if (sessionState.history.length > sstates) reduceHistorySize(sessionState, sstates);
-			if (sstates) session.set('state', sessionState); // don't do session writes if sstates is 0, NaN, undefined, etc.
+			if (sessionState.history.length > sstates) sessionState.history = State.marshalForSave(sstates).history;
+			if (sstates) session.set("state", sessionState); // don't do session writes if sstates is 0, NaN, undefined, etc.
 			pass = true;
-		}
-		catch (ex) {
-			console.log('session.set failed, recovering');
+		} catch (ex) {
+			console.log("session.set failed, recovering");
 			if (sstates > sessionState.history.length) sstates = sessionState.length;
 			while (sstates && !pass) {
 				try {
 					sstates--;
-					reduceHistorySize(sessionState, sstates);
-					session.set('state', sessionState);
+					sessionState.history = State.marshalForSave(sstates).history;
+					sessionState.history.forEach(s => (s.variables.options.maxStates = sstates));
+					session.set("state", sessionState);
 					pass = true;
-				}
-				catch (ex) {
+				} catch (ex) {
 					continue;
 				}
 			}
+			V.options.maxStates = Config.history.maxStates = Config.history.maxSessionStates = sstates;
+			Errors.report("Save data is too big for current History depth setting. It's value was automatically adjusted to " + V.maxStates);
 		}
 		return pass;
 	}
@@ -403,9 +410,9 @@ var State = (() => { // eslint-disable-line no-unused-vars, no-var
 						 pull : _active.pull
 					 }); */
 			_prng = PRNGWrapper.unmarshal({
-				seed: _prng.seed,
-				pull: _active.pull,
-				state: _active.prng || true
+				seed  : _prng.seed,
+				pull  : _active.pull,
+				state : _active.prng || true
 			});
 		}
 
@@ -586,7 +593,7 @@ var State = (() => { // eslint-disable-line no-unused-vars, no-var
 		_history.push(momentCreate(title, _active.variables));
 
 		if (_prng) {
-			/* Assign prng state to the moment's prng property. 
+			/* Assign prng state to the moment's prng property.
 				Old: historyTop().pull = _prng.pull; */
 			const top = historyTop();
 			top.pull = _prng.pull;
@@ -748,7 +755,7 @@ var State = (() => { // eslint-disable-line no-unused-vars, no-var
 		}
 
 		/* Regenerate the PRNG object, then assign the state to the active moment. */
-		_prng = new PRNGWrapper(seed, { state: true, entropy: useEntropy });
+		_prng = new PRNGWrapper(seed, { state : true, entropy : useEntropy });
 		_active.prng = _prng.state();
 		_active.pull = _prng.pull;
 	}
@@ -776,11 +783,12 @@ var State = (() => { // eslint-disable-line no-unused-vars, no-var
 			for (let i = 0; i < count; i++) {
 				if (typeof callback === 'function') {
 					values.push(callback(_prng.random()));
-				} else {
+				}
+				else {
 					values.push(_prng.random());
 				}
 			}
-			_prng = new PRNGWrapper(_prng.seed, { state: state });
+			_prng = new PRNGWrapper(_prng.seed, { state });
 		}
 		return values;
 	}
@@ -820,11 +828,37 @@ var State = (() => { // eslint-disable-line no-unused-vars, no-var
 		Variable Chain Parsing Functions.
 	*******************************************************************************************************************/
 	/*
+        Define a property with a getter and/or a setter.
+    */
+	function defineProperty(propertyName, descriptor) {
+		// Define a property with custom getter and setter.
+		Object.defineProperty(_definedProperties, propertyName, {
+			get() {
+				return typeof descriptor.get === 'function' ? descriptor.get.call(this[`__${propertyName}`]) : this[`__${propertyName}`];
+			},
+			set(value) {
+				if (typeof descriptor.set === 'function') {
+					descriptor.set.call(this[`__${propertyName}`], value);
+				} else {
+					this[`__${propertyName}`] = value;
+				}
+			},
+			enumerable   : true,
+			configurable : true
+		});
+	}
+	/*
 		Returns the value of the given story/temporary variable.
 	*/
 	function variableGet(varExpression) {
 		try {
-			return Scripting.evalTwineScript(varExpression);
+			const parsedVarExpression = Scripting.evalTwineScript(varExpression);
+
+			// Check if a custom getter is defined for the variable.
+			if (_definedProperties.hasOwnProperty(parsedVarExpression)) {
+				return _definedProperties[parsedVarExpression].get.call(this, this[`__${parsedVarExpression}`]);
+			}
+			return parsedVarExpression;
 		}
 		catch (ex) { /* no-op */ }
 	}
@@ -833,6 +867,13 @@ var State = (() => { // eslint-disable-line no-unused-vars, no-var
 		Sets the value of the given story/temporary variable.
 	*/
 	function variableSet(varExpression, value) {
+		const parsedVarExpression = Scripting.evalTwineScript(varExpression);
+
+		// Check if a custom setter is defined for the variable.
+		if (_definedProperties.hasOwnProperty(parsedVarExpression)) {
+			_definedProperties[parsedVarExpression].set.call(this, this[`__${parsedVarExpression}`], value);
+			return true;
+		}
 		try {
 			Scripting.evalTwineScript(`${varExpression} = evalTwineScript$Data$`, null, value);
 			return true;
@@ -1006,6 +1047,7 @@ var State = (() => { // eslint-disable-line no-unused-vars, no-var
 		/*
 			Variable Chain Parsing Functions.
 		*/
+		defineProperty,
 		getVar : { value : variableGet },
 		setVar : { value : variableSet },
 

@@ -1042,7 +1042,7 @@
 
 				while (evalJavaScript(condition)) {
 					if (Wikifier.stopWikify) return;
-
+					
 					if (--safety < 0) {
 						return this.error(`exceeded configured maximum loop iterations (${Config.macros.maxLoopIterations})`);
 					}
@@ -1640,8 +1640,7 @@
 						if (transition) {
 							setTimeout(() => $insert.removeClass(`macro-${this.name}-in`), Engine.minDomActionDelay);
 						}
-						// as adding and replacing content might add or change links, auto-regenerating the hotkeys might be needed
-						Links.generate();
+						setTimeout(() => Links.generate(), 0);
 					}
 				))
 				.appendTo(this.output);
@@ -2399,7 +2398,6 @@
 				this.debugView.modes({ hidden : true });
 			}
 
-			// re-number links
 			Links.generate();
 		}
 	});
@@ -3417,6 +3415,8 @@
 				return this.error('no passage specified');
 			}
 
+			// majou here. fuck goto, fuck it's async bullshit, and fuck everyone who uses it. may the truck-kun evacuate you from this plane of existence into a worse one. goto will be a button now.
+			const $link = jQuery(document.createElement('button'));
 			let passage;
 
 			if (typeof this.args[0] === 'object') {
@@ -3427,11 +3427,37 @@
 				// Argument was simply the passage name.
 				passage = this.args[0];
 			}
+			$link.append(document.createTextNode(passage))
 
 			if (!Story.has(passage)) {
 				return this.error(`passage "${passage}" does not exist`);
 			}
 
+			if (passage != null) { // lazy equality for null
+				$link.attr('data-passage', passage);
+
+				if (Story.has(passage)) {
+					$link.addClass('link-internal');
+
+					if (Config.addVisitedLinkClass && State.hasPlayed(passage)) {
+						$link.addClass('link-visited');
+					}
+				}
+				else {
+					$link.addClass('link-broken');
+				}
+			}
+			else {
+				$link.addClass('link-internal');
+			}
+
+			$link.addClass('macro-button')
+				 .ariaClick({
+					namespace: '.macros',
+					role     : 'button',
+					one      : true,
+				 }, this.createShadowWrapper(()=>Engine.play(passage)))
+				 .appendTo(this.output);
 			/*
 				Call `Engine.play()` asynchronously.
 
@@ -3441,8 +3467,7 @@
 				unwanted by users, who are used to the current behavior from
 				similar macros and constructs.
 			*/
-			if (!Config.navigation.gotohell) Wikifier.stopWikify = 2; // actually, let's make it.
-			setTimeout(() => Engine.play(passage), Engine.minDomActionDelay);
+			if (!Config.navigation.gotoButtons) setTimeout(() => Engine.play(passage), Engine.minDomActionDelay);
 		}
 	});
 

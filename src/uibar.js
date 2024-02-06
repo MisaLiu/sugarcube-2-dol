@@ -221,8 +221,9 @@ var UIBar = (() => { // eslint-disable-line no-unused-vars, no-var
 				ev.preventDefault();
 				// use idb when available
 				if (idb.active) {
-					Dialog.create('saves', 'saves').append($(document.createElement('h3')).addClass('saves-loading').text('Loading the save list, please wait...'));
-					idb.saveList();
+					Dialog.setup('saves', 'saveList');
+					setTimeout(() => idb.saveList());
+					//setTimeout(() => Dialog.resize());
 				}
 				// but keep the old system just in case
 				else UI.buildSaves();
