@@ -161,32 +161,29 @@ var UIBar = (() => { // eslint-disable-line no-unused-vars, no-var
 				label : L10n.get('uiBarToggle')
 			}, () => _$uiBar.toggleClass('stowed'));
 
-		if (Config.history.controls) {
-			jQuery('#history-backward')
-				.ariaDisabled(State.length < 2)
-				.ariaClick({
-					label : L10n.get('uiBarBackward')
-				}, () => Engine.backward());
+		jQuery('#history-backward')
+			.ariaDisabled(State.length < 2)
+			.ariaClick({
+				label : L10n.get('uiBarBackward')
+			}, () => Engine.backward());
 
-			if (Story.lookup('tags', 'bookmark').length > 0) {
-				jQuery('#history-jumpto')
-					.ariaClick({
-						label : L10n.get('uiBarJumpto')
-					}, () => UI.jumpto());
-			}
-			else {
-				jQuery('#history-jumpto').remove();
-			}
-
-			jQuery('#history-forward')
-				.ariaDisabled(State.length === State.size)
+		if (Story.lookup('tags', 'bookmark').length > 0) {
+			jQuery('#history-jumpto')
 				.ariaClick({
-					label : L10n.get('uiBarForward')
-				}, () => Engine.forward());
+					label : L10n.get('uiBarJumpto')
+				}, () => UI.jumpto());
 		}
 		else {
-			jQuery('#ui-bar-history').remove();
+			jQuery('#history-jumpto').remove();
 		}
+
+		jQuery('#history-forward')
+			.ariaDisabled(State.length === State.size)
+			.ariaClick({
+				label : L10n.get('uiBarForward')
+			}, () => Engine.forward());
+
+		if (!Config.history.controls) jQuery('#ui-bar-history').hide();
 
 		// Set up the story display title.
 		if (Story.has('StoryDisplayTitle')) {
@@ -222,7 +219,14 @@ var UIBar = (() => { // eslint-disable-line no-unused-vars, no-var
 				role : 'button'
 			}, ev => {
 				ev.preventDefault();
-				UI.buildSaves();
+				// use idb when available
+				if (idb.active) {
+					Dialog.setup('saves', 'saveList');
+					idb.saveList();
+					// setTimeout(() => Dialog.resize());
+				}
+				// but keep the old system just in case
+				else UI.buildSaves();
 				Dialog.open();
 			})
 			.text(L10n.get('savesTitle'));

@@ -6,7 +6,7 @@
 	Use of this source code is governed by a BSD 2-clause "Simplified" License, which may be found in the LICENSE file.
 
 ***********************************************************************************************************************/
-/* global Config, Diff, Engine, PRNGWrapper, Scripting, clone, session, storage */
+/* global Config, Diff, Engine, PRNGWrapper, Scripting, clone, session, storage, V */
 
 var State = (() => { // eslint-disable-line no-unused-vars, no-var
 	'use strict';
@@ -57,13 +57,13 @@ var State = (() => { // eslint-disable-line no-unused-vars, no-var
 	/*
 		Restores the story state from the active session.
 	*/
-	function stateRestore() {
+	function stateRestore(soft) {
 		if (DEBUG) { console.log('[State/stateRestore()]'); }
 
 		/*
 			Attempt to restore an active session.
 		*/
-		if (session.has('state')) {
+		if (session.has('state') && !soft) {
 			/*
 				Retrieve the session.
 			*/
@@ -82,34 +82,65 @@ var State = (() => { // eslint-disable-line no-unused-vars, no-var
 			return true;
 		}
 
+		// perform soft reset from history
+		if (soft) {
+			const frame = _history[_activeIndex];
+			if (!frame) return false;
+			const states = Config.history.maxSessionStates;
+			Config.history.maxSessionStates = 0; // prevent writes into sessionStorage
+			momentActivate(frame);
+			Config.history.maxSessionStates = states;
+			return true;
+		}
+
 		return false;
+	}
+
+	function reduceHistorySize(stateObj, targetSize) {
+		if (!targetSize) return;
+		// pick up which frames to preserve, aiming at preserving the frames both before and after the active one
+		const currentIndex = stateObj.index;
+		const currentHistoryLength = stateObj.history.length;
+		targetSize = Math.min(currentHistoryLength, targetSize);
+		const invertedIndex = currentHistoryLength - 1 - currentIndex;
+		let startingIndex = 0;
+		const radius = Math.floor(targetSize / 2); // how many frames can we cover on both sides from active frame
+
+		if (currentIndex < invertedIndex) { // active index is closer to the beginning of the array [* i * * * *]
+			if (radius >= currentIndex) startingIndex = 0; // there's enough space to include the oldest frame [(* i *) * * *]
+			else startingIndex = currentIndex - radius; // starting index will extend into the past as much as the radius can allow [* (* i *) * *]
+		}
+		else { // active index is closer to the end of the array [* * * * i *]
+			if (radius >= invertedIndex) startingIndex = currentHistoryLength - targetSize; // enough space to include the newest frame [* * * (* i *)]
+			else startingIndex = currentIndex - radius; // [* * (* i *) *]
+		}
+		stateObj.index -= startingIndex; // correct the index
+		stateObj.history = stateObj.history.slice(startingIndex, startingIndex + targetSize);
+
+		return stateObj;
 	}
 
 	/*
 		Returns the current story state marshaled into a serializable object.
 	*/
-	function stateMarshal(noDelta) {
+	function stateMarshal(noDelta = true, depth = Config.history.maxSessionStates, useClone = false) {
+		if (depth === 0) return null; // don't bother
 		/*
 			Gather the properties.
 		*/
 		const stateObj = {
-			index : _activeIndex
+			index   : _activeIndex,
+			history : useClone ? clone(_history) : _history
 		};
 
-		if (noDelta) {
-			stateObj.history = clone(_history);
-		}
-		else {
-			stateObj.delta = historyDeltaEncode(_history);
-		}
-
-		if (_expired.length > 0) {
-			stateObj.expired = [..._expired];
+		if (_history.length > depth) reduceHistorySize(stateObj, depth);
+		if (!noDelta) {
+			stateObj.delta = historyDeltaEncode(stateObj.history);
+			delete stateObj.history;
 		}
 
-		if (_prng !== null) {
-			stateObj.seed = _prng.seed;
-		}
+		if (_expired.length > 0) stateObj.expired = [..._expired];
+		if (_prng !== null && _prng.hasOwnProperty('seed')) stateObj.seed = _prng.seed;
 
 		return stateObj;
 	}
@@ -117,28 +148,28 @@ var State = (() => { // eslint-disable-line no-unused-vars, no-var
 	/*
 		Restores the story state from a marshaled story state serialization object.
 	*/
-	function stateUnmarshal(stateObj, noDelta) {
+	function stateUnmarshal(stateObj, noDeltaFlag = true) {
+		let noDelta = noDeltaFlag;
 		if (stateObj == null) { // lazy equality for null
 			throw new Error('state object is null or undefined');
 		}
 
-		if (
-			   !stateObj.hasOwnProperty(noDelta ? 'history' : 'delta')
-			|| stateObj[noDelta ? 'history' : 'delta'].length === 0
-		) {
-			throw new Error('state object has no history or history is empty');
+		if (!stateObj.hasOwnProperty(noDelta ? 'history' : 'delta') || stateObj[noDelta ? 'history' : 'delta'].length === 0) {
+			if (stateObj.hasOwnProperty('delta')) {
+				console.log("warning: stateObj is delta-encoded when it shouldn't be");
+				noDelta = false;
+			}
+			else if (stateObj.hasOwnProperty('history')) {
+				console.log('warning: stateObj is not delta-encoded when it should be');
+				noDelta = true;
+			}
+			else {
+				throw new Error('state object has no history or history is empty');
+			}
 		}
 
 		if (!stateObj.hasOwnProperty('index')) {
 			throw new Error('state object has no index');
-		}
-
-		if (_prng !== null && !stateObj.hasOwnProperty('seed')) {
-			throw new Error('state object has no seed, but PRNG is enabled');
-		}
-
-		if (_prng === null && stateObj.hasOwnProperty('seed')) {
-			throw new Error('state object has seed, but PRNG is disabled');
 		}
 
 		/*
@@ -148,7 +179,7 @@ var State = (() => { // eslint-disable-line no-unused-vars, no-var
 		_activeIndex = stateObj.index;
 		_expired     = stateObj.hasOwnProperty('expired') ? [...stateObj.expired] : [];
 
-		if (stateObj.hasOwnProperty('seed')) {
+		if (stateObj.hasOwnProperty('seed') && _prng !== null) {
 			/*
 				We only need to restore the PRNG's seed here as `momentActivate()` will handle
 				fully restoring the PRNG to its proper state.
@@ -165,8 +196,8 @@ var State = (() => { // eslint-disable-line no-unused-vars, no-var
 	/*
 		Returns the current story state marshaled into a save-compatible serializable object.
 	*/
-	function stateMarshalForSave() {
-		return stateMarshal(true);
+	function stateMarshalForSave(depth = 100, noDelta = true) {
+		return stateMarshal(noDelta, depth, true);
 	}
 
 	/*
@@ -213,6 +244,61 @@ var State = (() => { // eslint-disable-line no-unused-vars, no-var
 		}
 
 		return false;
+	}
+
+	/**
+	 * @returns {object} decoded session state
+	 */
+	function getSessionState() {
+		if (Config.history.maxSessionStates === 0) return;
+
+		const sessionState = session.get("state");
+		// if (Object.hasOwn(sessionState, "delta")) {
+		if (sessionState.hasOwnProperty("delta")) {
+			sessionState.history = State.deltaDecode(sessionState.delta);
+			delete sessionState.delta;
+		}
+		return sessionState;
+	}
+
+	/**
+	 * Tries saving sessionState into sessionStorage until it fits the quota.
+	 * sessionState must have history property.
+	 *
+	 * @param {object} sessionState decoded session state
+	 */
+	function setSessionState(sessionState) {
+		if (!sessionState || !sessionState.history) throw new Error("setSessionState error: not a valid sessionState object");
+		let pass = false;
+		let sstates = Config.history.maxSessionStates;
+		if (sstates === 0) return pass;
+
+		try {
+			// if history is bigger than session states limit, reduce the history to match
+			if (sessionState.history.length > sstates) reduceHistorySize(sessionState, sstates);
+			if (sstates) session.set("state", sessionState); // don't do session writes if sstates is 0, NaN, undefined, etc.
+			pass = true;
+		}
+		catch (ex) {
+			console.log("session.set failed, recovering");
+			if (sstates > sessionState.history.length) sstates = sessionState.length;
+			while (sstates && !pass) {
+				try {
+					sstates--;
+					reduceHistorySize(sessionState, sstates);
+					session.set("state", sessionState);
+					pass = true;
+				}
+				catch (ex) {
+					continue;
+				}
+			}
+			Config.history.maxSessionStates = sstates;
+			if (V.options) V.options.maxSessionStates = sstates;
+			// eslint-disable-next-line no-undef
+			if (Errors) Errors.report("Save data is too big for current History depth setting. It's value was automatically adjusted to " + sstates);
+		}
+		return pass;
 	}
 
 
@@ -305,7 +391,22 @@ var State = (() => { // eslint-disable-line no-unused-vars, no-var
 		/*
 			Update the active session.
 		*/
-		session.set('state', stateMarshal());
+		let pass = false;
+		while (Config.history.maxSessionStates > 0 && !pass) {
+			try {
+				session.set('state', stateMarshal());
+				pass = true;
+			}
+			catch { // maxSessionStates is too high to fit sessionStorage
+				console.log('session.set error, reducing maxSessionStates');
+				// eslint-disable-next-line max-len
+				if (Config.history.maxSessionStates > State.history.length) Config.history.maxSessionStates = State.history.length;
+				Config.history.maxSessionStates--;
+				if (window.Errors) { // call dol-specific errors reporter if available
+					window.Errors.report(`Save data is too big for current history depth setting. It's value was auto-adjusted to ${Config.history.maxSessionStates}`);
+				}
+			}
+		}
 
 		/*
 			Trigger a global `:historyupdate` event.
@@ -450,8 +551,11 @@ var State = (() => { // eslint-disable-line no-unused-vars, no-var
 			Truncate the history, if necessary, by discarding moments from the bottom.
 		*/
 		while (historySize() > Config.history.maxStates) {
-			// _expired.push(_history.shift().title); // TODO make 'maintain State.expired' an option?
-			_history.shift();
+			if (Config.history.maxExpired === 0) _history.shift();
+			else {
+				_expired.push(_history.shift().title);
+			}
+			while (_expired.length > Config.history.maxExpired) _expired.shift();
 		}
 
 		/*
@@ -733,6 +837,17 @@ var State = (() => { // eslint-disable-line no-unused-vars, no-var
 		return store ? Object.keys(store).length : 0;
 	}
 
+	/**
+	 * alias story and temporary variables to the global namespace
+	 */
+	Object.defineProperties(window, {
+		// often redefined by individual games, needs to be configurable
+		/* Story variables property. */
+		// eslint-disable-next-line id-length
+		V : { get() { return _active.variables; }, configurable : true },
+		/* Temporary variables property. */
+		T : { get() { return _tempVariables; }, configurable : true }
+	});
 
 	/*******************************************************************************************************************
 		Module Exports.
@@ -749,6 +864,8 @@ var State = (() => { // eslint-disable-line no-unused-vars, no-var
 		turns            : { get : stateTurns },
 		passages         : { get : stateTitles },
 		hasPlayed        : { value : stateHasPlayed },
+		getSessionState  : { value : getSessionState },
+		setSessionState  : { value : setSessionState },
 
 		/*
 			Moment Functions.

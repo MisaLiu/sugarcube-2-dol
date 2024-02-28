@@ -1643,6 +1643,8 @@
 						if (transition) {
 							setTimeout(() => $insert.removeClass(`macro-${this.name}-in`), Engine.minDomActionDelay);
 						}
+						// as adding and replacing content might add or change links, auto-regenerating the hotkeys might be needed
+						Links.generate();
 					}
 				))
 				.appendTo(this.output);
@@ -2399,6 +2401,9 @@
 			if (Config.debug) {
 				this.debugView.modes({ hidden : true });
 			}
+
+			// re-number links
+			Links.generate();
 		}
 	});
 
@@ -3439,6 +3444,7 @@
 				unwanted by users, who are used to the current behavior from
 				similar macros and constructs.
 			*/
+			Wikifier.stopWikify = 2; // actually, let's make it.
 			setTimeout(() => Engine.play(passage), Engine.minDomActionDelay);
 		}
 	});

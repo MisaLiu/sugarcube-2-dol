@@ -435,7 +435,10 @@
 (() => {
 	'use strict';
 
-	const _nativeMathRandom = Math.random;
+	function _nativeMathRandom(useMath) {
+		if (useMath || !State.prng.isEnabled()) return Math.random();
+		return window.SugarCube.State.random();
+	}
 
 
 	/*******************************************************************************************************************
@@ -444,20 +447,31 @@
 	/*
 		Returns a pseudo-random whole number (integer) within the given bounds.
 	*/
-	function _random(/* [min ,] max */) {
-		let min;
+	function _random(/* [min ,] max, [useMath] */) {
+		let min = 0;
 		let max;
+		let useMath = false;
 
 		switch (arguments.length) {
 		case 0:
 			throw new Error('_random called with insufficient parameters');
 		case 1:
-			min = 0;
 			max = arguments[0];
+			break;
+		case 2:
+			if (arguments[1] === true) {
+				max = arguments[0];
+				useMath = arguments[1];
+			}
+			else {
+				min = arguments[0];
+				max = arguments[1];
+			}
 			break;
 		default:
 			min = arguments[0];
 			max = arguments[1];
+			useMath = arguments[2];
 			break;
 		}
 
@@ -465,10 +479,11 @@
 			[min, max] = [max, min];
 		}
 
-		return Math.floor(_nativeMathRandom() * (max - min + 1)) + min;
+		return Math.floor(_nativeMathRandom(useMath) * (max - min + 1)) + min;
 	}
 
 	/*
+		[DEPRECATED]
 		Returns a randomly selected index within the given length and bounds.
 		Bounds may be negative.
 	*/
@@ -603,13 +618,12 @@
 	*******************************************************************************************************************/
 	/*
 		Randomly selects an element from the given array, or array-like object, and returns it.
-		[DEPRECATED] Optionally, from within the given bounds.
 	*/
 	Object.defineProperty(Array, 'random', {
 		configurable : true,
 		writable     : true,
 
-		value(array /* DEPRECATED: [, [min ,] max] */) {
+		value(array, useMath) {
 			if (
 				   typeof array !== 'object'
 				|| array === null
@@ -624,9 +638,7 @@
 				return;
 			}
 
-			const index = arguments.length === 0
-				? _random(0, length - 1)
-				: _randomIndex(length, Array.prototype.slice.call(arguments, 1));
+			const index = _random(0, length - 1, useMath);
 
 			return array[index];
 		}
@@ -997,13 +1009,12 @@
 
 	/*
 		Randomly removes an element from the base array and returns it.
-		[DEPRECATED] Optionally, from within the given bounds.
 	*/
 	Object.defineProperty(Array.prototype, 'pluck', {
 		configurable : true,
 		writable     : true,
 
-		value(/* DEPRECATED: [min ,] max */) {
+		value(useMath) {
 			if (this == null) { // lazy equality for null
 				throw new TypeError('Array.prototype.pluck called on null or undefined');
 			}
@@ -1014,9 +1025,7 @@
 				return;
 			}
 
-			const index = arguments.length === 0
-				? _random(0, length - 1)
-				: _randomIndex(length, [...arguments]);
+			const index = _random(0, length - 1, useMath);
 
 			return Array.prototype.splice.call(this, index, 1)[0];
 		}
@@ -1103,13 +1112,12 @@
 
 	/*
 		Randomly selects an element from the base array and returns it.
-		[DEPRECATED] Optionally, from within the given bounds.
 	*/
 	Object.defineProperty(Array.prototype, 'random', {
 		configurable : true,
 		writable     : true,
 
-		value(/* DEPRECATED: [min ,] max */) {
+		value(useMath) {
 			if (this == null) { // lazy equality for null
 				throw new TypeError('Array.prototype.random called on null or undefined');
 			}
@@ -1120,9 +1128,7 @@
 				return;
 			}
 
-			const index = arguments.length === 0
-				? _random(0, length - 1)
-				: _randomIndex(length, [...arguments]);
+			const index = _random(0, length - 1, useMath);
 
 			return this[index];
 		}

@@ -24,6 +24,8 @@ var Config = (() => { // eslint-disable-line no-unused-vars, no-var
 	// State history settings.
 	let _historyControls  = true;
 	let _historyMaxStates = 40;
+	let _sessionMaxStates = 40;
+	let _expiredMaxStates = 100;
 
 	// Macros settings.
 	let _macrosIfAssignmentError   = true;
@@ -50,6 +52,7 @@ var Config = (() => { // eslint-disable-line no-unused-vars, no-var
 	let _savesSlots           = 8;
 	let _savesTryDiskOnMobile = true;
 	let _savesVersion;
+	let _savesUseLZString     = -1; // try autodetect
 
 	// UI settings.
 	let _uiStowBarInitially    = 800;
@@ -131,6 +134,20 @@ var Config = (() => { // eslint-disable-line no-unused-vars, no-var
 				if (_historyControls && value === 1) {
 					_historyControls = false;
 				}
+			},
+
+			get maxSessionStates() { return _sessionMaxStates; },
+			set maxSessionStates(value) {
+				if (!Number.isSafeInteger(value) || value < 0) {
+					throw new RangeError('Config.history.maxSessionStates must be a non-negative integer');
+				}
+
+				_sessionMaxStates = value;
+			},
+
+			get maxExpired() { return _expiredMaxStates; },
+			set maxExpired(value) {
+				_expiredMaxStates = value;
 			},
 
 			// legacy
@@ -322,6 +339,9 @@ var Config = (() => { // eslint-disable-line no-unused-vars, no-var
 
 			get version() { return _savesVersion; },
 			set version(value) { _savesVersion = value; },
+
+			get useLZString() { return _savesUseLZString; },
+			set useLZString(value) { return _savesUseLZString = value; },
 
 			// legacy
 			// Die if deprecated saves onLoad handler getter is accessed.
