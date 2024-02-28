@@ -199,6 +199,7 @@ const idb = (() => {
 			return [save, data];
 		}
 
+		let mtCount = 0;
 		const oldSaves = Save.get();
 		const autoSave = oldSaves.autosave;
 		if (autoSave != null) {
@@ -207,12 +208,29 @@ const idb = (() => {
 			const saveData = processSave(save);
 			// setItem only allows one operation at a time to prevent possible exploits, so wait for it to finish
 			await setItem(0, saveData[0], { slot: 0, data: saveData[1] });
-		}
+		} else mtCount++;
 		for (let i = 0; i < oldSaves.slots.length; i++) {
 			const slotSave = oldSaves.slots[i];
 			if (slotSave != null) {
 				const saveData = processSave(slotSave);
 				await setItem(i + 1, saveData[0], { slot: i + 1, data: saveData[1] });
+			} else mtCount++;
+		}
+		if (mtCount === oldSaves.slots.length + 1) { // all slots are empty, different storage method?
+			const index = storage.get("index");
+			if (index && index.slots) {
+				// fc-like
+				const autosave = storage.get("autosave");
+				if (autosave) {
+					const saveData = processSave(autosave);
+					await setItem(0, saveData[0], { slot: 0, data: saveData[1] });
+				}
+				for (let i = 0; i < index.slots.length; i++) {
+					const slotSave = storage.get("slot" + i);
+					if (!slotSave) continue;
+					const saveData = processSave(slotSave);
+					await setItem(i + 1, saveData[0], { slot: i + 1, data: saveData[1] });
+				}
 			}
 		}
 		await getSaveDetails().then(d => saveDetails = d);

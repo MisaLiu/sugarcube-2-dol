@@ -35,6 +35,7 @@ var Config = (() => { // eslint-disable-line no-unused-vars, no-var
 
 	// Navigation settings.
 	let _navigationOverride;
+	let _navigationRememberYPos ;
 
 	// Passages settings.
 	let _passagesDescriptions;
@@ -193,7 +194,9 @@ var Config = (() => { // eslint-disable-line no-unused-vars, no-var
 				}
 
 				_navigationOverride = value;
-			}
+			},
+			get rememberYPos() { return _navigationRememberYPos; },
+			set rememberYPos(value) { _navigationRememberYPos = value; }
 		}),
 
 		/*

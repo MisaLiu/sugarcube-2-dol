@@ -55,9 +55,10 @@
 			// Call the true handler.
 			fn.apply(this, arguments);
 
-			const doJump = function(){ window.scrollTo(0, savedYOffset); }
-			if ( dataPassage && (window.lastDataPassageLink === dataPassage || initialDataPassage === dataPassage))
-				doJump();
+			const doJump = () => window.scrollTo(0, savedYOffset);
+			if (dataPassage && (window.lastDataPassageLink === dataPassage || initialDataPassage === dataPassage)) {
+				if (Config.navigation.rememberYPos && (!V.options || V.options && V.options.scrollRemember !== false)) doJump();
+			}
 			window.lastDataPassageLink = dataPassage;
 		};
 	}
