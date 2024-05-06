@@ -105,7 +105,8 @@
 }
 
 #savesListContainer .savesListRow .saveGroup .saveName {
-	width: 60px;
+	width: 3em;
+	white-space: nowrap;
 }
 
 #savesListContainer .savesListRow .saveGroup .saveButton input {

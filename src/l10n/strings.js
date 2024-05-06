@@ -96,7 +96,7 @@ var l10nStrings = { // eslint-disable-line no-unused-vars, no-var
 		idb related
 	*/
 	savesDisallowedReplay     : 'The scene viewer is currently in use, preventing the use of the save system.',
-	savesExportReminder       : 'Saves here will be lost if your browser cache is cleared. Exporting is recommended to prevent the loss of saves from occurring.',
+	savesExportReminder       : 'Saves here will be lost if your browser cache is cleared. Saving to disk is recommended to avoid save loss.',
 	savesHeaderSaveLoad       : 'Save/Load',
 	savesHeaderIDName         : 'ID/Name',
 	savesHeaderDetails        : 'Details',

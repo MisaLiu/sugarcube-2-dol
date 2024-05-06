@@ -437,7 +437,7 @@
 
 	function _nativeMathRandom(useMath) {
 		if (useMath || !State.prng.isEnabled()) return Math.random();
-		return window.SugarCube.State.random();
+		return State.random();
 	}
 
 

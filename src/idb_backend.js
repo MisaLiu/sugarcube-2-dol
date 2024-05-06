@@ -15,15 +15,24 @@
 const idb = (() => {
 	"use strict";
 
-	if (window.indexedDB == null) return Object.freeze({ active: false, lock: true }); // return early if indexedDB is unavailable
+	// return early if indexedDB is unavailable
+	if (window.indexedDB == null) return Object.freeze({
+		lock: true,
+		active: false,
+		init() { return false },
+		get active() { return false },
+		set active(_) { return false },
+		get footerHTML() { return false },
+		set footerHTML(_) { return false },
+	});
 
 	let lock = true; // don't allow multiple operations at the same time, majority of sugarcube is not async
 	let active = true; // whether to use indexedDB or the old localStorage
 	let dbName = "idb"; // database name
 	let migrationNeeded = false; // flag to migrate old saves
-	let open = false;
-	let settings = {};
-	let saveDetails = [];
+	let open = false; // some browsers randomly decide to close db still in use
+	let settings = {}; // persistent db settings stored in localStorage
+	let saveDetails = []; // cache so we don't have to query all items from details store on every page change
 
 	let db; // database to be
 
@@ -761,7 +770,7 @@ const idb = (() => {
 			disabled: listPage === 1,
 			onclick: () => {
 				if (listPage > 1) listPage--;
-				saveList();
+				saveList("show saves");
 			},
 		});
 
@@ -776,7 +785,7 @@ const idb = (() => {
 			max: listPageMax,
 			onchange: () => {
 				listPage = Math.clamp(Math.round(pageNum.value), 1, listPageMax);
-				saveList();
+				saveList("show saves");
 			},
 		});
 
@@ -788,7 +797,7 @@ const idb = (() => {
 			disabled: listPage >= listPageMax,
 			onclick: () => {
 				if (listPage < listPageMax) listPage++;
-				saveList();
+				saveList("show saves");
 			},
 		});
 
@@ -803,7 +812,7 @@ const idb = (() => {
 			max: listLengthMax,
 			onchange: () => {
 				listLength = Math.clamp(pageLen.value, 1, listLengthMax);
-				saveList();
+				saveList("show saves");
 			},
 		});
 
@@ -815,7 +824,7 @@ const idb = (() => {
 			onclick: () => {
 				// potentially exploitable to allow saving to slots way above the limit, but the limit is arbitrary to begin with, and idb doesn't actually suffer one bit from going beyond that limit
 				listPage = Math.floor((latestSave.slot - 1) / listLength + 1);
-				saveList();
+				saveList("show saves");
 				setTimeout(() => {
 					const el = document.getElementById("latestSaveRow");
 					if (el != null) {
@@ -832,6 +841,8 @@ const idb = (() => {
 		return pager;
 	}
 
+	// itch app must die or at least update to kitch version, smh
+	const replaceChildren = !!document.body.replaceChildren;
 
 	// alias for closing the saves menu
 	if (typeof window.closeOverlay === "undefined") window.closeOverlay = Dialog.close;
@@ -842,9 +853,14 @@ const idb = (() => {
 	 * @param {string} mode switch for displaying saves list or confirmations
 	 * @param {object} details save details for confirmations
 	 */
-	async function saveList(mode = "show saves", details) {
+	async function saveList(mode, details) {
 		if (!open) await openDB();
 		if (active && !settings.active) updateSettings("active", true); // for when it's called from old save menu
+		if (!mode) {
+			// update saveDetails every time menu opens with no options, in case game was saved in another tab
+			await getSaveDetails().then(d => saveDetails = d);
+			mode = "show saves";
+		}
 
 		await setTimeout(0); // this actually ensures that #saveList had time to render into DOM
 		const savesDiv = document.getElementById("saveList") || document.getElementsByClassName("saveList")[0] || document.getElementsByClassName("saves")[0];
@@ -969,7 +985,11 @@ const idb = (() => {
 				list.append(L10n.get("savesOptionsConfirmOn"), "[ ", reqSaveLabel, " ] [ ", reqLoadLabel, " ] [ ", reqDeleteLabel, " ]", document.createElement("br"), idbToggleLabel);
 
 				setTimeout(() => {
-					savesDiv.replaceChildren(list);
+					if (replaceChildren) savesDiv.replaceChildren(list);
+					else { // curse you, itch app!
+						savesDiv.innerHTML = "";
+						savesDiv.appendChild(list);
+					}
 					const pageField = document.getElementById("pageNum");
 					if (pageField != null) pageField.value = listPage;
 					const lengthField = document.getElementById("pageLen");
@@ -1004,12 +1024,18 @@ const idb = (() => {
 				confirmSaveWarning.append(confirmSaveWarningTitle, generateOldSaveDescription(details), saveButton, cancelButton);
 
 				list.appendChild(confirmSaveWarning);
-				setTimeout(() => savesDiv.replaceChildren(list), Engine.minDomActionDelay);
+				setTimeout(() => {
+					if (replaceChildren) savesDiv.replaceChildren(list);
+					else { // curse you, itch app!
+						savesDiv.innerHTML = "";
+						savesDiv.appendChild(list);
+					}
+				}, Engine.minDomActionDelay);
 				break;
 			}
 			case "confirm delete": {
 				// skip confirmation if corresponding toggle is off
-				if (!settings.delete) return deleteItem(details.slot).then(() => saveList());
+				if (!settings.delete) return deleteItem(details.slot).then(() => saveList("show saves"));
 				const confirmDeleteWarning = document.createElement("div");
 				confirmDeleteWarning.className = "saveBorder";
 				const confirmDeleteWarningTitle = document.createElement("h3");
@@ -1021,13 +1047,19 @@ const idb = (() => {
 					type: "button",
 					className: "saveMenuButton saveMenuConfirm",
 					value: L10n.get("savesLabelDelete"),
-					onclick: () => deleteItem(details.slot).then(() => saveList()),
+					onclick: () => deleteItem(details.slot).then(() => saveList("show saves")),
 				});
 
 				confirmDeleteWarning.append(confirmDeleteWarningTitle, generateOldSaveDescription(details), deleteButton, cancelButton);
 
 				list.appendChild(confirmDeleteWarning);
-				setTimeout(() => savesDiv.replaceChildren(list), Engine.minDomActionDelay);
+				setTimeout(() => {
+					if (replaceChildren) savesDiv.replaceChildren(list);
+					else { // curse you, itch app!
+						savesDiv.innerHTML = "";
+						savesDiv.appendChild(list);
+					}
+				}, Engine.minDomActionDelay);
 				break;
 			}
 			case "confirm load": {
@@ -1049,7 +1081,13 @@ const idb = (() => {
 				confirmLoad.append(confirmLoadTitle, generateOldSaveDescription(details), loadButton, cancelButton);
 
 				list.appendChild(confirmLoad);
-				setTimeout(() => savesDiv.replaceChildren(list), Engine.minDomActionDelay);
+				setTimeout(() => {
+					if (replaceChildren) savesDiv.replaceChildren(list);
+					else { // curse you, itch app!
+						savesDiv.innerHTML = "";
+						savesDiv.appendChild(list);
+					}
+				}, Engine.minDomActionDelay);
 				break;
 			}
 			case "confirm clear": {
@@ -1065,12 +1103,18 @@ const idb = (() => {
 					type: "button",
 					className: "saveMenuButton saveMenuConfirm",
 					value: L10n.get("savesLabelClear"),
-					onclick: () => clearAll().then(() => saveList()),
+					onclick: () => clearAll().then(() => saveList("show saves")),
 				});
 				confirmClear.append(confirmClearTitle, clearButton, cancelButton);
 
 				list.appendChild(confirmClear);
-				setTimeout(() => savesDiv.replaceChildren(list), Engine.minDomActionDelay);
+				setTimeout(() => {
+					if (replaceChildren) savesDiv.replaceChildren(list);
+					else { // curse you, itch app!
+						savesDiv.innerHTML = "";
+						savesDiv.appendChild(list);
+					}
+				}, Engine.minDomActionDelay);
 				break;
 			}
 		}
