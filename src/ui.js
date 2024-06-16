@@ -97,7 +97,7 @@ var UI = (() => { // eslint-disable-line no-unused-vars, no-var
 	function uiOpenSaves(/* options, closeFn */ ...args) {
 		// use idb when available
 		if (idb.active) {
-			Dialog.setup('saves', 'saveList');
+			Dialog.setup('saves', 'saves');
 			idb.saveList();
 		}
 		else uiBuildSaves();
@@ -339,12 +339,12 @@ var UI = (() => { // eslint-disable-line no-unused-vars, no-var
 				$tdSlot.append(document.createTextNode(i + 1));
 
 				if (saves.slots[i]) {
-					// Add the load button.
+					// Add the save and load buttons.
 					$tdLoad.append(
+						createButton('save', 'ui-close', L10n.get('savesLabelSave'), i, Save.slots.save),
 						createButton('load', 'ui-close', L10n.get('savesLabelLoad'), i, slot => {
 							jQuery(document).one(':dialogclosed', () => Save.slots.load(slot));
-						}),
-						createButton('save', 'ui-close', L10n.get('savesLabelSave'), i, Save.slots.save)
+						})
 					);
 
 					// Add the description (title and datestamp).
@@ -420,6 +420,14 @@ var UI = (() => { // eslint-disable-line no-unused-vars, no-var
 					L10n.get('savesLabelExport'),
 					savesAllowed ? () => Save.export() : null
 				));
+				if (navigator.clipboard) {
+					$btnBar.append(createActionItem(
+						'toClipboard',
+						'ui-close',
+						L10n.get('savesLabelToClipboard'),
+						savesAllowed ? () => navigator.clipboard.writeText(Save.serialize()) : null
+					));
+				}
 				$btnBar.append(createActionItem(
 					'import',
 					null,
@@ -451,15 +459,6 @@ var UI = (() => { // eslint-disable-line no-unused-vars, no-var
 					.appendTo($dialogBody);
 			}
 
-			jQuery(document.createElement('label')).attr('id', 'idbToggleSaves').append(
-			jQuery(document.createElement('input'))
-				.attr({ id : 'checkbox-idbactive', name : 'checkbox-idbactive', type : 'checkbox', checked : idb.active && !V.ironmanmode, disabled : idb.lock || V.ironmanmode })
-				.addClass('macro-checkbox')
-				.on('change.macros', () => { idb.active = document.getElementById('checkbox-idbactive').checked; document.getElementById('ui-dialog-body').className = 'saveList'; idb.saveList(); })
-		)
-			.appendTo($btnBar)
-			.append(' Enable indexedDB ');
-
 			if (savesOk) {
 				$btnBar.append(createActionItem(
 					'clear',
@@ -473,6 +472,22 @@ var UI = (() => { // eslint-disable-line no-unused-vars, no-var
 						: null
 				));
 			}
+
+			const $idbBar = jQuery(document.createElement('ul'))
+				.addClass('buttons')
+				.appendTo($dialogBody);
+
+			$idbBar.append(createActionItem(
+				'idbToggleSaves',
+				null,
+				'Enable indexedDB',
+				Save.autosave.has() || !Save.slots.isEmpty()
+					? () => {
+						idb.updateSettings('active', true);
+						idb.saveList();
+					}
+					: null
+			));
 
 			return true;
 		}

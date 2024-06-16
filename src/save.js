@@ -29,6 +29,39 @@ var Save = (() => { // eslint-disable-line no-unused-vars, no-var
 	const _onSaveHandlers = new Set();
 
 
+	/********************************
+		split save stuff
+	********************************/
+	let useSplit = () => Story.domId === 'free-cities'; // todo: make it a proper toggle
+	function indexGet() {
+		return storage.get('index');
+	}
+
+	function splitSave(slot, data) {
+		storage.set(slot === 'autosave' ? slot : `slot${slot}`, data);
+		const index = indexGet();
+		delete data.state;
+		slot === 'autosave' ? index.autosave = data : index.slots[slot] = data;
+		try {
+			storage.set('index', index);
+		}
+		catch (ex) {
+			storage.delete(slot === 'autosave' ? 'autosave' : `slot${slot}`);
+			// eslint-disable-next-line no-alert
+			alert('Storage quota exceeded, try removing other saves first');
+		}
+
+		return true;
+	}
+
+	function splitDelete(slot) {
+		storage.delete(slot === 'autosave' ? slot : `slot${slot}`);
+		const index = indexGet();
+		slot === 'autosave' ? index.autosave = null : index.slots[slot] = null;
+		storage.set('index', index);
+		return true;
+	}
+
 	/*******************************************************************************************************************
 		Saves Functions.
 	*******************************************************************************************************************/
@@ -46,17 +79,6 @@ var Save = (() => { // eslint-disable-line no-unused-vars, no-var
 
 		let saves   = savesObjGet();
 		let updated = false;
-
-		/* legacy */
-		// Convert an ancient saves array into a new saves object.
-		if (Array.isArray(saves)) {
-			saves = {
-				autosave : null,
-				slots    : saves
-			};
-			updated = true;
-		}
-		/* /legacy */
 
 		// Handle the author changing the number of save slots.
 		if (Config.saves.slots !== saves.slots.length) {
@@ -102,12 +124,17 @@ var Save = (() => { // eslint-disable-line no-unused-vars, no-var
 	}
 
 	function savesObjGet() {
-		const saves = storage.get('saves');
+		const saves = storage.get(useSplit() ? 'index' : 'saves');
 		return saves === null ? savesObjCreate() : saves;
 	}
 
 	function savesObjClear() {
 		storage.delete('saves');
+		if (useSplit()) {
+			storage.delete('index');
+			storage.delete('autosave');
+			for (let i = 0; i < Config.save.slots - 1; i++) storage.delete(`slot${i}`);
+		}
 		return true;
 	}
 
@@ -124,7 +151,7 @@ var Save = (() => { // eslint-disable-line no-unused-vars, no-var
 	}
 
 	function autosaveHas() {
-		const saves = savesObjGet();
+		const saves = useSplit() ? { autosave : storage.get('autosave') } : savesObjGet();
 
 		if (saves.autosave === null) {
 			return false;
@@ -134,12 +161,12 @@ var Save = (() => { // eslint-disable-line no-unused-vars, no-var
 	}
 
 	function autosaveGet() {
-		const saves = savesObjGet();
+		const saves = useSplit() ? { autosave : storage.get('autosave') } : savesObjGet();
 		return saves.autosave;
 	}
 
 	function autosaveLoad() {
-		const saves = savesObjGet();
+		const saves = useSplit() ? { autosave : storage.get('autosave') } : savesObjGet();
 
 		if (saves.autosave === null) {
 			return false;
@@ -171,12 +198,16 @@ var Save = (() => { // eslint-disable-line no-unused-vars, no-var
 			supplemental.metadata = metadata;
 		}
 
-		saves.autosave = _marshal(supplemental, { type : Type.Autosave });
+		const saveData = _marshal(supplemental, { type : Type.Autosave });
+		if (useSplit()) return splitSave('autosave', saveData);
+		saves.autosave = saveData;
 
 		return _savesObjSave(saves);
 	}
 
 	function autosaveDelete() {
+		if (useSplit()) return splitDelete('autosave');
+
 		const saves = savesObjGet();
 		saves.autosave = null;
 		return _savesObjSave(saves);
@@ -239,7 +270,7 @@ var Save = (() => { // eslint-disable-line no-unused-vars, no-var
 			return null;
 		}
 
-		return saves.slots[slot];
+		return useSplit() ? storage.get(`slot${slot}`) : saves.slots[slot];
 	}
 
 	function slotsLoad(slot) {
@@ -253,7 +284,7 @@ var Save = (() => { // eslint-disable-line no-unused-vars, no-var
 			return false;
 		}
 
-		return _unmarshal(saves.slots[slot]);
+		return _unmarshal(useSplit() ? storage.get(`slot${slot}`) : saves.slots[slot]);
 	}
 
 	function slotsSave(slot, title, metadata) {
@@ -287,7 +318,10 @@ var Save = (() => { // eslint-disable-line no-unused-vars, no-var
 			supplemental.metadata = metadata;
 		}
 
-		saves.slots[slot] = _marshal(supplemental, { type : Type.Slot });
+		const saveData = _marshal(supplemental, { type : Type.Slot });
+		if (useSplit()) return splitSave(slot, saveData);
+
+		saves.slots[slot] = saveData;
 
 		return _savesObjSave(saves);
 	}
@@ -302,6 +336,8 @@ var Save = (() => { // eslint-disable-line no-unused-vars, no-var
 		if (slot >= saves.slots.length) {
 			return false;
 		}
+
+		if (useSplit()) return splitDelete(slot);
 
 		saves.slots[slot] = null;
 		return _savesObjSave(saves);

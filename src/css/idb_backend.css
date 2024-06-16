@@ -1,74 +1,31 @@
-/* "this just works" */
-
-:root {
-	/* Primary Colours
-	These are the primary greyscale colours used in the default theme
-	--000 representing the lightest white and foreground
-	--900 representing the darkest black and background
-	The rest represent colours in the range of greyscale from light to dark ala Tailwind Naming Conventions
-	*/
-	--000: #eee;
-	--100: #ddd;
-	--150: #ccc;
-	--200: #bbb;
-	--300: #aaa;
-	--400: #999;
-	--500: #888;
-	--600: #777;
-	--700: #666;
-	--750: #444;
-	--800: #333;
-	--850: #222;
-	--900: #111;
-
-	/* Accent Colours */
-	--red: #ec3535;
-	--pink: #e40081;
-	--pink-secondary: #d67caf;
-	--purple: #80f;
-	--purple-secondary: #aa4bc8;
-	--blue: #4372ff;
-	--blue-secondary: #559bc0;
-	--teal: #08c1c1;
-	--green: #38b20a;
-	--green-secondary: #7caf7c;
-	--lime: #44e342;
-	--orange: #f28500;
-	--brown: #4c2217;
-	--black: #929292;
-	--yellow: #ffd700;
-	--gold: gold;
-	--silver: silver;
-
-	/* Utility */
-	--link: #5888dd;
-	--link-hover: #8af;
-
-	/* Tooltip */
-	--tooltip-background: #1a1919;
-	--tooltip-border: #b0b0b4;
+#saves-export-reminder {
+	padding: 0.5em 1em 0;
 }
 
-.saveList input {
-	width: auto;
-}
-
-#savesListContainer {
+#saves-list-container {
 	display: flex;
 	flex-direction: column;
-	border: 1px solid var(--400);
-	max-width: 800px;
 }
 
-#savesListContainer .savesListRow {
+#saves-list-container .savesListRow {
 	display: flex;
 	flex-flow: row nowrap;
 	align-items: center;
-	border: 1px solid var(--400);
+	border-top: 1px solid #444;
 	padding: 4px;
 }
 
-#savesListContainer .savesListRow .saveGroup {
+#saves-list-container .savesListRow:first-child {
+	border-top: none;
+}
+
+@media (min-width: 40rem) {
+	#saves-list-container .savesListRow {
+		max-height: 2.4em;
+	}
+}
+
+#saves-list-container .savesListRow .saveGroup {
 	display: flex;
 	flex-flow: row wrap;
 	align-items: center;
@@ -78,7 +35,7 @@
 	min-width: 0;
 }
 
-#savesListContainer .savesListRow .saveGroup > div {
+#saves-list-container .savesListRow .saveGroup > div {
 	display: flex;
 	justify-content: center;
 	margin: 0 10px;
@@ -86,34 +43,29 @@
 	flex-shrink: 0;
 }
 
-#savesListContainer .savesListRow .saveGroup .saveId {
+#saves-list-container .savesListRow .saveGroup .saveId {
 	min-width: 2em;
 	margin-left: 4px;
 	margin-right: -6px;
 }
 
-.jumpToSaveTransition {
-	background-color: var(--750);
-	transition-duration: 1s;
-}
 
-#savesListContainer .savesListRow .saveGroup .saveButton {
+#saves-list-container .savesListRow .saveGroup .saveButton {
 	display: flex;
 	justify-content: center;
 	min-width: 110px;
 	margin: 0 10px;
 }
 
-#savesListContainer .savesListRow .saveGroup .saveName {
-	width: 3em;
-	white-space: nowrap;
+#saves-list-container .savesListRow .saveGroup .saveName {
+	width: 5em;
 }
 
-#savesListContainer .savesListRow .saveGroup .saveButton input {
+#saves-list-container .savesListRow .saveGroup .saveButton input {
 	margin: 3px 0;
 }
 
-#savesListContainer .savesListRow .saveGroup > .saveDetails {
+#saves-list-container .savesListRow .saveGroup > .saveDetails {
 	display: flex;
 	flex: 1 1 0;
 	flex-direction: column;
@@ -122,10 +74,15 @@
 	min-width: 100px;
 }
 
-#savesListContainer .savesListRow .saveGroup > .saveDetails span {
+#saves-list-container .savesListRow .saveGroup > .saveDetails span {
 	max-height: 80px;
 	white-space: nowrap;
 	overflow-x: clip;
+}
+
+.jumpToSaveTransition {
+	background-color: #444;
+	transition-duration: 1s;
 }
 
 /*
@@ -142,39 +99,6 @@
 	justify-content: stretch;
 }
 
-/* export button */
-#savesListFooter #exportButton {
-	background-color: var(--blue);
-	border: 1px solid var(--500);
-}
-
-#savesListFooter #exportButton:before {
-	font-family: "tme-fa-icons";
-	content: "\e829\00a0";
-}
-
-/* import button */
-#savesListFooter #importButton {
-	border: 1px solid var(--500);
-	padding: .4em;
-	cursor: pointer;
-}
-
-#savesListFooter #importButton:before {
-	font-family: "tme-fa-icons";
-	content: "\e82a\00a0";
-}
-
-/* clear button */
-#savesListFooter #clearButton {
-	border: 1px solid var(--500);
-}
-
-#savesListFooter #clearButton:before {
-	font-family: "tme-fa-icons";
-	content: "\e827\00a0";
-}
-
 .datestamp {
 	font-size: 0.8em;
 }
@@ -189,35 +113,26 @@
 }
 
 .saveMenuButton {
-	background-color: var(--blue) !important;
+	background-color: #35a !important;
 }
 
 .saveMenuButton:hover {
-	background-color: var(--blue) !important;
+	background-color: #35a !important;
 }
 
 .saveMenuConfirm {
 	margin-top: 20px;
-	margin-left: 5em;
-}
-
-.saveBorder {
-	max-width: 700px;
-	margin: 10px 2px;
-	padding: 5px 2px 30px;
-	border: 1px solid var(--200);
+	margin-left: 150px;
 }
 
 .green {
-	color: var(--green);
+	color: #38b20a
 }
 
-.gold,
-.gold button,
-.goldLink a {
-	color: var(--gold);
+.gold {
+	color: gold;
 }
 
 .red {
-	color: var(--red);
+	color: #ec3535;
 }

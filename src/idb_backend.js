@@ -1,4 +1,4 @@
-/* eslint no-undef: "off", no-param-reassign: "off", no-alert: "off", no-fallthrough: "off", no-dupe-args: "warn", no-irregular-whitespace: "warn", max-len: "off", key-spacing: ["warn", {beforeColon: false, afterColon: true}], comma-dangle: ["warn", "always-multiline"], quotes: ["warn", "double"], indent: ["warn", "tab", {SwitchCase: 1}], id-length: "off", prefer-template: "off", brace-style: ["warn", "1tbs"] */
+/* eslint no-undef: "off", no-param-reassign: "off", no-alert: "off", no-fallthrough: "off", no-dupe-args: "warn", no-irregular-whitespace: "warn", max-len: "off", key-spacing: ["warn", {beforeColon: false, afterColon: true}], comma-dangle: ["warn", "always-multiline"], quotes: ["warn", "double"], indent: ["warn", "tab", {SwitchCase: 1}], id-length: "off", brace-style: ["warn", "1tbs"] */
 
 /*
  * "simple" indexedDB backend for storing save data, working similarly to existing webStorage system
@@ -18,12 +18,13 @@ const idb = (() => {
 	// return early if indexedDB is unavailable
 	if (window.indexedDB == null) return Object.freeze({
 		lock: true,
-		active: false,
-		init() { return false },
-		get active() { return false },
-		set active(_) { return false },
-		get footerHTML() { return false },
-		set footerHTML(_) { return false },
+		/* eslint-disable brace-style */
+		init() { return false; },
+		get active() { return false; },
+		set active(_) { return false; },
+		get footerHTML() { return false; },
+		set footerHTML(_) { return false; },
+		/* eslint-enable brace-style */
 	});
 
 	let lock = true; // don't allow multiple operations at the same time, majority of sugarcube is not async
@@ -32,6 +33,7 @@ const idb = (() => {
 	let migrationNeeded = false; // flag to migrate old saves
 	let open = false; // some browsers randomly decide to close db still in use
 	let settings = {}; // persistent db settings stored in localStorage
+	updateSettings();
 	let saveDetails = []; // cache so we don't have to query all items from details store on every page change
 
 	let db; // database to be
@@ -66,7 +68,6 @@ const idb = (() => {
 			openRequest.onsuccess = () => {
 				db = openRequest.result;
 				lock = false;
-				active = true;
 				open = true;
 				getSaveDetails().then(d => saveDetails = d);
 				console.log("idbOpen success");
@@ -109,7 +110,7 @@ const idb = (() => {
 			warnSave: V.confirmSave || false,
 			warnLoad: V.confirmLoad || false,
 			warnDelete: V.confirmDelete || true,
-			active: true,
+			active: !window.FCHostPersistent,
 			useDelta: false,
 		};
 		if (setting) settings[setting] = value;
@@ -125,17 +126,18 @@ const idb = (() => {
 	 *
 	 * @param {object} target to scan
 	 * @param {object} path to report
+	 * @param {boolean} verbose flag to report objects too complex for idb
 	 */
 	function funNuke(target, path = "", verbose = true) {
 		if (!target) return console.log("no target specified");
 		for (const key in target) {
 			const value = target[key];
-			const newPath = path + "['" + key + "']";
+			const newPath = `${path}['${key}']`;
 			if (value == null) continue;
 			else if (typeof value === "function" || value.toJSON) {
 				// we've got a baddie, round him up!
 				if (verbose && V.idbTest) {
-					console.log("Warn: " + newPath + " of type " + typeof value + " shouldn't be in STORY variables!!!");
+					console.log(`Warn: ${newPath} of type ${typeof value} shouldn't be in STORY variables!!!`);
 				}
 				target[key] = JSON.stringify(value);
 				baddies.push(newPath);
@@ -235,7 +237,7 @@ const idb = (() => {
 					await setItem(0, saveData[0], { slot: 0, data: saveData[1] });
 				}
 				for (let i = 0; i < index.slots.length; i++) {
-					const slotSave = storage.get("slot" + i);
+					const slotSave = storage.get("slot" + i); // eslint-disable-line prefer-template
 					if (!slotSave) continue;
 					const saveData = processSave(slotSave);
 					await setItem(i + 1, saveData[0], { slot: i + 1, data: saveData[1] });
@@ -311,7 +313,12 @@ const idb = (() => {
 		const metadata = { saveId: saveVars.saveId, saveName: saveVars.saveName };
 		const detailsItem = details || {
 			slot,
-			data: { id: Story.domId, title: Story.get(State.passage).description(), date: Date.now(), metadata },
+			data: {
+				id: Story.domId,
+				title: Story.get(State.passage).description(),
+				date: Date.now(),
+				metadata,
+			},
 		};
 		detailsItem.slot = slot; // ensure that slot is in the details
 
@@ -340,8 +347,8 @@ const idb = (() => {
 			return makePromise(transactionRequest);
 		} catch (ex) {
 			// admit the defeat and go home
-			if (window.Errors) Errors.report("idb.setItem failure unknown. Couldn't complete the save in slot " + slot);
-			else alert("idb.setItem failure unknown. Couldn't complete the save in slot " + slot);
+			if (window.Errors) Errors.report(`idb.setItem failure unknown. Couldn't complete the save in slot ${slot}`);
+			else alert(`idb.setItem failure unknown. Couldn't complete the save in slot ${slot}`);
 			lock = false;
 			// return a promise, because some code down the line expects .then()
 			return new Promise(resolve => resolve(false));
@@ -481,7 +488,9 @@ const idb = (() => {
 	 * @returns {DocumentFragment};
 	 */
 	function generateSavesPage(page = listPage - 1, length = listLength) {
-		const listContainer = document.createDocumentFragment();
+		const listContainer = document.createElement("div");
+		listContainer.id = "saves-list-container";
+		listContainer.appendChild(generateHeaderRow());
 		// cache whether saves are allowed
 		const saveUnlock = savesAllowed();
 
@@ -500,6 +509,11 @@ const idb = (() => {
 			// idb is indexed by slot, so the highest is always last
 			const slot = saveDetails.length ? saveDetails.last().slot : 0;
 			// adjust list length to include saves in the highest slot
+			// max pages is 20 (still too low if you're using 1080x1920 portrait mode)
+			// by default, list length is 10, resulting into up to 200 slots across 20 pages
+			// max list length is 20, resulting into up to 400 slots
+			// having a save anywhere in slots > 200 shall increase list length so it won't disappear
+			// it can also be used to increase default list length without any extra variables
 			for (listLength = 10; slot > listLength * listPageMax && listLength < listLengthMax; listLength++);
 			length = listLength;
 		}
@@ -547,7 +561,6 @@ const idb = (() => {
 			detailsObj.saveUnlock = saveUnlock;
 			listContainer.appendChild(generateSaveRow(detailsObj));
 		}
-		listContainer.appendChild(generateFooterRow());
 
 		return listContainer;
 	}
@@ -599,68 +612,52 @@ const idb = (() => {
 	 * construct the footer row for the save list
 	 * warning: unnecessarily complicated DOM manipulations
 	 *
-	 * @returns {DocumentFragment} footer row
+	 * @returns {HTMLUListElement} footer row
 	 */
 	function generateFooterRow() {
-		const frag = document.createDocumentFragment();
-		const savesListFooter = document.createElement("div");
-		savesListFooter.id = "savesListFooter";
-		savesListFooter.className = "savesListRow";
-		frag.appendChild(savesListFooter);
+		const container = document.createElement("ul");
+		container.className = "buttons";
+		let li;
 
-		if (footerHTML) {
-			// override footer row with provided html string
-			savesListFooter.innerHTML = footerHTML;
-			return frag;
+		const exportButton = document.createElement("button");
+		exportButton.id = "saves-export";
+		exportButton.className = "ui-close";
+		exportButton.innerText = L10n.get("savesLabelExport");
+		exportButton.disabled = !savesAllowed();
+		exportButton.onclick = savesAllowed() ? Save.export : null;
+		li = document.createElement("li");
+		li.appendChild(exportButton);
+		container.appendChild(li);
+
+		if (navigator.clipboard) {
+			const toClipboardButton = document.createElement("button");
+			toClipboardButton.id = "saves-toClipboard";
+			toClipboardButton.className = "ui-close";
+			toClipboardButton.innerText = L10n.get("savesLabelToClipboard");
+			toClipboardButton.disabled = !savesAllowed();
+			toClipboardButton.onclick = savesAllowed ? navigator.clipboard.writeText(Save.serialize()) : null;
+			li = document.createElement("li");
+			li.appendChild(toClipboardButton);
+			container.appendChild(li);
 		}
 
-		// import/export div
-		const footerImportExport = document.createElement("div");
-		savesListFooter.appendChild(footerImportExport);
+		const importButton = document.createElement("button");
+		importButton.id = "saves-import";
+		importButton.innerText = L10n.get("savesLabelImport");
+		importButton.onclick = () => jQuery(document.createElement("input")).prop("type", "file").on("change", SugarCube.Save.import).trigger("click"); // gotta give it to anthaum for finding this
+		li = document.createElement("li");
+		li.appendChild(importButton);
+		container.appendChild(li);
 
-		// export button
-		const exportButton = document.createElement("button");
-		Object.assign(exportButton, {
-			id: "exportButton",
-			className: "saveButton",
-			innerText: L10n.get("savesLabelExport"),
-			onclick: () => {
-				if (savesAllowed()) Save.export();
-			},
-		});
-		footerImportExport.appendChild(exportButton);
-
-		// import button, but actually a label for the input form
-		const importButton = document.createElement("label");
-		Object.assign(importButton, {
-			id: "importButton",
-			htmlFor: "saves-import",
-			innerText: L10n.get("savesLabelImport"),
-			className: "saveButton saveMenuButton",
-		});
-		footerImportExport.appendChild(importButton);
-
-		// import file input form
-		const importButtonInput = document.createElement("input");
-		Object.assign(importButtonInput, {
-			type: "file",
-			id: "saves-import",
-			style: "display: none",
-			onchange: ev => Save.import(ev),
-		});
-		importButton.appendChild(importButtonInput);
-
-		// clear all button
 		const clearAllButton = document.createElement("button");
-		Object.assign(clearAllButton, {
-			id: "clearButton",
-			className: "saveButton saveMenuButton right",
-			innerText: L10n.get("savesLabelClear"),
-			onclick: () => saveList("confirm clear"),
-		});
-		savesListFooter.appendChild(clearAllButton);
+		clearAllButton.className = "saves-clear";
+		clearAllButton.innerText = L10n.get("savesLabelClear");
+		clearAllButton.onclick = () => saveList("confirm clear");
+		li = document.createElement("li");
+		li.appendChild(clearAllButton);
+		container.appendChild(li);
 
-		return frag;
+		return container;
 	}
 
 	/**
@@ -692,9 +689,8 @@ const idb = (() => {
 		saveload.className = "saveButton";
 
 		// save button
-		const saveButton = document.createElement("input");
-		saveButton.type = "button";
-		saveButton.value = L10n.get("savesLabelSave");
+		const saveButton = document.createElement("button");
+		saveButton.innerText = L10n.get("savesLabelSave");
 		if (details.saveUnlock) {
 			saveButton.className = "saveMenuButton";
 			saveButton.onclick = () => saveList("confirm save", details);
@@ -703,9 +699,8 @@ const idb = (() => {
 		}
 
 		// load button
-		const loadButton = document.createElement("input");
-		loadButton.type = "button";
-		loadButton.value = L10n.get("savesLabelLoad");
+		const loadButton = document.createElement("button");
+		loadButton.innerText = L10n.get("savesLabelLoad");
 		if (details.date) {
 			loadButton.className = "saveMenuButton";
 			loadButton.onclick = () => saveList("confirm load", details);
@@ -741,12 +736,9 @@ const idb = (() => {
 		saveDetails.appendChild(date);
 
 		// delete button
-		const deleteButton = document.createElement("input");
-		Object.assign(deleteButton, {
-			className: "deleteButton right",
-			type: "button",
-			value: L10n.get("savesLabelDelete"),
-		});
+		const deleteButton = document.createElement("button");
+		deleteButton.className = "deleteButton right";
+		deleteButton.innerText = L10n.get("savesLabelDelete");
 		if (details.date) {
 			deleteButton.classList.add("saveMenuButton");
 			deleteButton.onclick = () => saveList("confirm delete", details);
@@ -761,18 +753,30 @@ const idb = (() => {
 		return row;
 	}
 
+	/**
+	 * @returns {HTMLUListElement}
+	 */
 	function generatePager() {
+		const container = document.createElement("ul");
+		container.className = "buttons";
+		let li;
+
+		li = document.createElement("li");
+		li.append(L10n.get("savesPagerPage"));
+		container.appendChild(li);
+
 		// previous page button
-		const prevPage = document.createElement("input");
-		Object.assign(prevPage, {
-			type: "button",
-			value: " < ",
-			disabled: listPage === 1,
-			onclick: () => {
-				if (listPage > 1) listPage--;
-				saveList("show saves");
-			},
-		});
+		const prevPage = document.createElement("button");
+		prevPage.append("<");
+		prevPage.disabled = listPage === 1;
+		prevPage.onclick = () => {
+			if (listPage > 1) listPage--;
+			saveList("show saves");
+		};
+		li = document.createElement("li");
+		li.appendChild(prevPage);
+		container.appendChild(li);
+
 
 		// page number input
 		const pageNum = document.createElement("input");
@@ -788,18 +792,23 @@ const idb = (() => {
 				saveList("show saves");
 			},
 		});
+		container.appendChild(pageNum); // Not in a li to keep closer to buttons
 
 		// next page button
-		const nextPage = document.createElement("input");
-		Object.assign(nextPage, {
-			type: "button",
-			value: " > ",
-			disabled: listPage >= listPageMax,
-			onclick: () => {
-				if (listPage < listPageMax) listPage++;
-				saveList("show saves");
-			},
-		});
+		const nextPage = document.createElement("button");
+		nextPage.append(">");
+		nextPage.disabled = listPage >= listPageMax;
+		nextPage.onclick = () => {
+			if (listPage < listPageMax) listPage++;
+			saveList("show saves");
+		};
+		li = document.createElement("li");
+		li.appendChild(nextPage);
+		container.appendChild(li);
+
+		li = document.createElement("li");
+		li.append(L10n.get("savesPagerSavesPerPage"));
+		container.appendChild(li);
 
 		// list length input
 		const pageLen = document.createElement("input");
@@ -815,30 +824,30 @@ const idb = (() => {
 				saveList("show saves");
 			},
 		});
+		li = document.createElement("li");
+		li.append(pageLen);
+		container.appendChild(li);
 
 		// jump to most recent save button
-		const jumpToLatest = document.createElement("input");
-		Object.assign(jumpToLatest, {
-			type: "button",
-			value: L10n.get("savesPagerJump"),
-			onclick: () => {
-				// potentially exploitable to allow saving to slots way above the limit, but the limit is arbitrary to begin with, and idb doesn't actually suffer one bit from going beyond that limit
-				listPage = Math.floor((latestSave.slot - 1) / listLength + 1);
-				saveList("show saves");
-				setTimeout(() => {
-					const el = document.getElementById("latestSaveRow");
-					if (el != null) {
-						el.classList.remove("jumpToSaveTransition");
-						el.classList.add("jumpToSaveTransition");
-					}
-				}, Engine.minDomActionDelay);
-			},
-		});
+		const jumpToLatest = document.createElement("button");
+		jumpToLatest.innerText = L10n.get("savesPagerJump");
+		jumpToLatest.onclick = () => {
+			// potentially exploitable to allow saving to slots way above the limit, but the limit is arbitrary to begin with, and idb doesn't actually suffer one bit from going beyond that limit
+			listPage = Math.floor((latestSave.slot - 1) / listLength + 1);
+			saveList("show saves");
+			setTimeout(() => {
+				const el = document.getElementById("latestSaveRow");
+				if (el != null) {
+					el.classList.remove("jumpToSaveTransition");
+					el.classList.add("jumpToSaveTransition");
+				}
+			}, Engine.minDomActionDelay + 100);
+		};
+		li = document.createElement("li");
+		li.appendChild(jumpToLatest);
+		container.appendChild(li);
 
-		const pager = document.createElement("div");
-		pager.append(L10n.get("savesPagerPage"), prevPage, pageNum, nextPage, L10n.get("savesPagerSavesPerPage"), pageLen, jumpToLatest);
-
-		return pager;
+		return container;
 	}
 
 	// itch app must die or at least update to kitch version, smh
@@ -862,18 +871,15 @@ const idb = (() => {
 			mode = "show saves";
 		}
 
-		await setTimeout(0); // this actually ensures that #saveList had time to render into DOM
+		await new Promise(r => setTimeout(0, r(true))); // this actually ensures that #saveList had time to render into DOM
 		const savesDiv = document.getElementById("saveList") || document.getElementsByClassName("saveList")[0] || document.getElementsByClassName("saves")[0];
 		const list = document.createDocumentFragment();
 
 		// prepare a re-usable cancel button
-		const cancelButton = document.createElement("input");
-		Object.assign(cancelButton, {
-			type: "button",
-			className: "saveMenuButton saveMenuConfirm",
-			value: L10n.get("cancel"),
-			onclick: () => saveList("show saves"),
-		});
+		const cancelButton = document.createElement("button");
+		cancelButton.className = "saveMenuButton saveMenuConfirm";
+		cancelButton.innerText = L10n.get("cancel");
+		cancelButton.onclick = () => saveList("show saves");
 
 		// prepare old save info (if provided)
 		function generateOldSaveDescription(details) {
@@ -906,6 +912,7 @@ const idb = (() => {
 				}
 
 				const exportReminder = document.createElement("p");
+				exportReminder.id = "saves-export-reminder";
 				exportReminder.innerText = L10n.get("savesExportReminder");
 				list.appendChild(exportReminder);
 
@@ -922,67 +929,76 @@ const idb = (() => {
 					list.appendChild(lostSaves);
 				}
 
-
 				// THE SAVES LIST
-				const savesList = document.createElement("div");
-				savesList.id = "savesListContainer";
-				// add header
-				savesList.appendChild(generateHeaderRow());
-				savesList.appendChild(generateSavesPage());
-				list.appendChild(savesList);
+				list.appendChild(generateSavesPage());
+
+				// button row
+				list.appendChild(generateFooterRow());
 
 				// add pager
 				list.appendChild(generatePager());
 
 				// add confirmation toggles
+				let ul = document.createElement("ul");
+				ul.className = "buttons";
+				let li;
+				li = document.createElement("li");
+				li.append(L10n.get("savesOptionsConfirmOn"));
+				ul.appendChild(li);
+
 				const reqSaveLabel = document.createElement("label");
-				reqSaveLabel.innerText = L10n.get("savesLabelSave") + " ";
+				reqSaveLabel.innerText = L10n.get("savesOptionsOverwrite");
 				const reqSave = document.createElement("input");
-				Object.assign(reqSave, {
-					type: "checkbox",
-					checked: settings.save,
-					onchange: () => updateSettings("save", reqSave.checked),
-				});
+				reqSave.type = "checkbox";
+				reqSave.checked = V.confirmSave;
+				reqSave.onchange = () => V.confirmSave = reqSave.checked;
 				reqSaveLabel.appendChild(reqSave);
+				li = document.createElement("li");
+				li.appendChild(reqSaveLabel);
+				ul.appendChild(li);
 
 				const reqLoadLabel = document.createElement("label");
-				reqLoadLabel.innerText = L10n.get("savesLabelLoad") + " ";
+				reqLoadLabel.innerText = L10n.get("savesLabelLoad");
 				const reqLoad = document.createElement("input");
-				Object.assign(reqLoad, {
-					type: "checkbox",
-					checked: settings.load,
-					onchange: () => updateSettings("load", reqLoad.checked),
-				});
+				reqLoad.type = "checkbox";
+				reqLoad.checked = V.confirmLoad;
+				reqLoad.onchange = () => V.confirmLoad = reqLoad.checked;
 				reqLoadLabel.appendChild(reqLoad);
+				li = document.createElement("li");
+				li.appendChild(reqLoadLabel);
+				ul.append("|", li);
 
 				const reqDeleteLabel = document.createElement("label");
-				reqDeleteLabel.innerText = L10n.get("savesLabelDelete") + " ";
+				reqDeleteLabel.innerText = L10n.get("savesLabelDelete");
 				const reqDelete = document.createElement("input");
-				Object.assign(reqDelete, {
-					type: "checkbox",
-					checked: settings.delete,
-					onchange: () => updateSettings("delete", reqDelete.checked),
-				});
+				reqDelete.type = "checkbox";
+				reqDelete.checked = V.confirmDelete;
+				reqDelete.onchange = () => V.confirmDelete = reqDelete.checked;
 				reqDeleteLabel.appendChild(reqDelete);
+				li = document.createElement("li");
+				li.appendChild(reqDeleteLabel);
+				ul.append("|", li);
+
+				// last element gets floated to the right. empty one doesn't matter
+				ul.append(document.createElement("li"));
+
+				list.append(ul);
 
 				// add instant idb switcher
-				const idbToggleLabel = document.createElement("label");
-				idbToggleLabel.innerText = L10n.get("savesOptionsUseLegacy");
-				const idbToggle = document.createElement("input");
-				Object.assign(idbToggle, {
-					type: "checkbox",
-					checked: !idb.active,
-					onchange: () => {
-						updateSettings("active", !idbToggle.checked);
-						if (!idb.active) {
-							if (window.DoLSave)	Wikifier.wikifyEval("<<replace #saveList>><<saveList>><</replace>>");
-							else UI.buildSaves();
-						}
-					},
-				});
-				idbToggleLabel.appendChild(idbToggle);
-
-				list.append(L10n.get("savesOptionsConfirmOn"), "[ ", reqSaveLabel, " ] [ ", reqLoadLabel, " ] [ ", reqDeleteLabel, " ]", document.createElement("br"), idbToggleLabel);
+				ul = document.createElement("ul");
+				ul.className = "buttons";
+				const idbtoggle = document.createElement("button");
+				idbtoggle.id = "saves-idb-toggle";
+				idbtoggle.innerText = L10n.get("savesOptionsUseLegacy");
+				idbtoggle.onclick = () => {
+					updateSettings("active", false);
+					if (window.DoLSave)	$.wiki("<<replace #saveList>><<saveList>><</replace>>");
+					else UI.buildSaves();
+				};
+				li = document.createElement("li");
+				li.appendChild(idbtoggle);
+				ul.appendChild(li);
+				list.appendChild(ul);
 
 				setTimeout(() => {
 					if (replaceChildren) savesDiv.replaceChildren(list);
@@ -1006,7 +1022,7 @@ const idb = (() => {
 
 				const confirmSaveWarningTitle = document.createElement("h3");
 				confirmSaveWarningTitle.className = "red";
-				confirmSaveWarningTitle.innerText = (details.date === "" ? L10n.get("savesWarningSaveOnSlot") : L10n.get("savesWarningOverwriteSlot")) + details.slot + "?";
+				confirmSaveWarningTitle.innerText = `${details.date === "" ? L10n.get("savesWarningSaveOnSlot") : L10n.get("savesWarningOverwriteSlot")} ${details.slot}?`;
 
 				if (details.date && V.saveId !== details.metadata.saveId) {
 					const overwriteWarning = document.createElement("span");
@@ -1040,7 +1056,7 @@ const idb = (() => {
 				confirmDeleteWarning.className = "saveBorder";
 				const confirmDeleteWarningTitle = document.createElement("h3");
 				confirmDeleteWarningTitle.className = "red";
-				confirmDeleteWarningTitle.innerText = L10n.get("savesWarningDeleteInSlot") + (details.slot === 0 ? "auto" : details.slot) + "?";
+				confirmDeleteWarningTitle.innerText = `${L10n.get("savesWarningDeleteInSlot") + (details.slot === 0 ? "auto" : details.slot)}?`;
 
 				const deleteButton = document.createElement("input");
 				Object.assign(deleteButton, {
@@ -1069,7 +1085,7 @@ const idb = (() => {
 				confirmLoad.className = "saveBorder";
 				const confirmLoadTitle = document.createElement("h3");
 				confirmLoadTitle.className = "red";
-				confirmLoadTitle.innerText = L10n.get("savesWarningLoad") + (details.slot === 0 ? "auto" : details.slot) + "?";
+				confirmLoadTitle.innerText = `${L10n.get("savesWarningLoad") + (details.slot === 0 ? "auto" : details.slot)}?`;
 
 				const loadButton = document.createElement("input");
 				Object.assign(loadButton, {
