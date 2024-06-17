@@ -950,8 +950,8 @@ const idb = (() => {
 				reqSaveLabel.innerText = L10n.get("savesOptionsOverwrite");
 				const reqSave = document.createElement("input");
 				reqSave.type = "checkbox";
-				reqSave.checked = V.confirmSave;
-				reqSave.onchange = () => V.confirmSave = reqSave.checked;
+				reqSave.checked = settings.warnSave;
+				reqSave.onchange = () => updateSettings("warnSave", reqSave.checked);
 				reqSaveLabel.appendChild(reqSave);
 				li = document.createElement("li");
 				li.appendChild(reqSaveLabel);
@@ -961,8 +961,8 @@ const idb = (() => {
 				reqLoadLabel.innerText = L10n.get("savesLabelLoad");
 				const reqLoad = document.createElement("input");
 				reqLoad.type = "checkbox";
-				reqLoad.checked = V.confirmLoad;
-				reqLoad.onchange = () => V.confirmLoad = reqLoad.checked;
+				reqLoad.checked = settings.warnLoad;
+				reqLoad.onchange = () => updateSettings("warnLoad", reqLoad.checked);
 				reqLoadLabel.appendChild(reqLoad);
 				li = document.createElement("li");
 				li.appendChild(reqLoadLabel);
@@ -972,8 +972,8 @@ const idb = (() => {
 				reqDeleteLabel.innerText = L10n.get("savesLabelDelete");
 				const reqDelete = document.createElement("input");
 				reqDelete.type = "checkbox";
-				reqDelete.checked = V.confirmDelete;
-				reqDelete.onchange = () => V.confirmDelete = reqDelete.checked;
+				reqDelete.checked = setting.warnDelete;
+				reqDelete.onchange = () => updateSettings("warnDelete", reqDelete.checked);
 				reqDeleteLabel.appendChild(reqDelete);
 				li = document.createElement("li");
 				li.appendChild(reqDeleteLabel);
@@ -1016,7 +1016,7 @@ const idb = (() => {
 			}
 			case "confirm save": {
 				// skip confirmation if the slot is empty, but do not skip on saveId mismatch, even if confirmation is not required
-				if (!details.date || !settings.save && details.metadata.saveId === V.saveId) return saveState(details.slot).then(window.closeOverlay());
+				if (!details.date || !settings.warnSave && details.metadata.saveId === V.saveId) return saveState(details.slot).then(window.closeOverlay());
 				const confirmSaveWarning = document.createElement("div");
 				confirmSaveWarning.className = "saveBorder";
 
@@ -1051,7 +1051,7 @@ const idb = (() => {
 			}
 			case "confirm delete": {
 				// skip confirmation if corresponding toggle is off
-				if (!settings.delete) return deleteItem(details.slot).then(() => saveList("show saves"));
+				if (!settings.warnDelete) return deleteItem(details.slot).then(() => saveList("show saves"));
 				const confirmDeleteWarning = document.createElement("div");
 				confirmDeleteWarning.className = "saveBorder";
 				const confirmDeleteWarningTitle = document.createElement("h3");
@@ -1080,7 +1080,7 @@ const idb = (() => {
 			}
 			case "confirm load": {
 				// skip confirmation if corresponding toggle is off
-				if (!settings.load) return loadState(details.slot).then(() => window.closeOverlay());
+				if (!settings.warnLoad) return loadState(details.slot).then(() => window.closeOverlay());
 				const confirmLoad = document.createElement("div");
 				confirmLoad.className = "saveBorder";
 				const confirmLoadTitle = document.createElement("h3");
