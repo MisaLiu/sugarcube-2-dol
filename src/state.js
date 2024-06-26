@@ -6,7 +6,7 @@
 	Use of this source code is governed by a BSD 2-clause "Simplified" License, which may be found in the LICENSE file.
 
 ***********************************************************************************************************************/
-/* global Config, Diff, Engine, PRNGWrapper, Scripting, clone, session, storage, V */
+/* global Config, Diff, Engine, stupidrng, Scripting, clone, session, storage, V */
 
 var State = (() => { // eslint-disable-line no-unused-vars, no-var
 	'use strict';
@@ -51,7 +51,7 @@ var State = (() => { // eslint-disable-line no-unused-vars, no-var
 		_active      = momentCreate();
 		_activeIndex = -1;
 		_expired     = [];
-		_prng        = _prng === null ? null : new PRNGWrapper(_prng.seed, { state : true });
+		_prng        = _prng === null ? null : new stupidrng(_prng.seed);
 	}
 
 	/*
@@ -381,11 +381,7 @@ var State = (() => { // eslint-disable-line no-unused-vars, no-var
 			Restore the seedable PRNG.
 		*/
 		if (_prng !== null) {
-			_prng = PRNGWrapper.unmarshal({
-				seed  : _prng.seed,
-				pull  : _active.pull,
-				state : _active.prng || true
-			});
+			_prng = new stupidrng(_prng.seed, _active.pull);
 		}
 
 		/*
@@ -544,7 +540,6 @@ var State = (() => { // eslint-disable-line no-unused-vars, no-var
 		if (_prng) {
 			const top = historyTop();
 			top.pull = _prng.pull;
-			top.prng = _prng.state();
 		}
 
 		/*
@@ -666,8 +661,7 @@ var State = (() => { // eslint-disable-line no-unused-vars, no-var
 		}
 
 		/* Regenerate the PRNG object, then assign the state to the active moment. */
-		_prng = new PRNGWrapper(seed, { state : true, entropy : useEntropy });
-		_active.prng = _prng.state();
+		_prng = new stupidrng(seed);
 		_active.pull = _prng.pull;
 	}
 
@@ -683,25 +677,16 @@ var State = (() => { // eslint-disable-line no-unused-vars, no-var
 		return _prng ? _prng.seed : null;
 	}
 
-	function prngState() {
-		return _prng ? _prng.state() : null;
+	function prngPeek(count) {
+		return _prng.peek(count);
 	}
 
-	function prngPeek(count, callback = undefined) {
-		const values = [];
-		if (_prng) {
-			const state = _prng.state();
-			for (let i = 0; i < count; i++) {
-				if (typeof callback === 'function') {
-					values.push(callback(_prng.random()));
-				}
-				else {
-					values.push(_prng.random());
-				}
-			}
-			_prng = new PRNGWrapper(_prng.seed, { state });
-		}
-		return values;
+	function prngStr2Int(string) {
+		return _prng.str2int(string);
+	}
+
+	function prngTest(count, granularity, advancerng) {
+		return _prng.test(count, granularity, advancerng);
 	}
 
 	function prngRandom() {
@@ -903,7 +888,8 @@ var State = (() => { // eslint-disable-line no-unused-vars, no-var
 				isEnabled : { value : prngIsEnabled },
 				pull      : { get : prngPull },
 				seed      : { get : prngSeed },
-				state     : { get : prngState },
+				str2int   : { value : prngStr2Int },
+				test      : { value : prngTest },
 				peek      : { value : prngPeek }
 			}))
 		},

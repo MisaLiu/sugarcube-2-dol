@@ -35,7 +35,7 @@ const CONFIG = {
 			'src/lib/simplestore/adapters/cookie.js',
 			'src/lib/debugview.js',
 			'src/lib/nodetyper.js',
-			'src/lib/prngwrapper.js',
+			'src/stupidrandom.js',
 			'src/lib/stylewrapper.js',
 			'src/util/enumfrom.js',
 			'src/lib/diff.js',
@@ -99,7 +99,6 @@ const CONFIG = {
 		'src/vendor/imagesloaded.pkgd.min.js',
 		'src/vendor/lz-string.min.js',
 		'src/vendor/FileSaver.min.js',
-		'src/vendor/seedrandom.min.js',
 		'src/vendor/console-hack.min.js'
 	],
 	twine1 : {
