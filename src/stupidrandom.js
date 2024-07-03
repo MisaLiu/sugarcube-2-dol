@@ -1,7 +1,8 @@
 /* dumb predictable rng algorithm that i came up with as i was falling asleep yesterday */
 /* copyleft anomajou, 2024 */
+/* also, you owe author a beer now */
 
-class stupidrng {
+class PRNG {
 	constructor(seed, pull) {
 		// primes are a prime source of entropy in our generator. pun intended. intend your puns, people!
 		this.primes = [2, 3, 5, 7, 11, 13, 17, 19, 23, 29];
@@ -47,6 +48,7 @@ class stupidrng {
 	random(peek = 0) {
 		if (!peek) ++this.pull;
 		const limiter = this.limiter;
+		// prefer seedInt before seed, allowing seed to stay a string
 		const seed = this.seedInt || this.seed;
 		// make sure seed matters more by affecting effective pull so the chaos can catch up
 		// chaos in this case being the ability of tiny variation in seed to result in huge difference in the outcome
@@ -102,4 +104,4 @@ class stupidrng {
 		return distribution;
 	}
 }
-window.stupidrng = stupidrng;
+window.PRNG = PRNG;
