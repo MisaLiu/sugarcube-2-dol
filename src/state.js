@@ -6,7 +6,7 @@
 	Use of this source code is governed by a BSD 2-clause "Simplified" License, which may be found in the LICENSE file.
 
 ***********************************************************************************************************************/
-/* global Config, Diff, Engine, stupidrng, Scripting, clone, session, storage, V */
+/* global Config, Diff, Engine, PRNG, Scripting, clone, session, storage, V */
 
 var State = (() => { // eslint-disable-line no-unused-vars, no-var
 	'use strict';
@@ -51,7 +51,7 @@ var State = (() => { // eslint-disable-line no-unused-vars, no-var
 		_active      = momentCreate();
 		_activeIndex = -1;
 		_expired     = [];
-		_prng        = _prng === null ? null : new stupidrng(_prng.seed);
+		_prng        = _prng === null ? null : new PRNG(_prng.seed);
 	}
 
 	/*
@@ -381,7 +381,7 @@ var State = (() => { // eslint-disable-line no-unused-vars, no-var
 			Restore the seedable PRNG.
 		*/
 		if (_prng !== null) {
-			_prng = new stupidrng(_prng.seed, _active.pull);
+			_prng = new PRNG(_prng.seed, _active.pull);
 		}
 
 		/*
@@ -661,7 +661,7 @@ var State = (() => { // eslint-disable-line no-unused-vars, no-var
 		}
 
 		/* Regenerate the PRNG object, then assign the state to the active moment. */
-		_prng = new stupidrng(seed);
+		_prng = new PRNG(seed);
 		_active.pull = _prng.pull;
 	}
 
