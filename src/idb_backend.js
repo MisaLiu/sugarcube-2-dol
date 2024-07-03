@@ -623,8 +623,10 @@ const idb = (() => {
 		exportButton.id = "saves-export";
 		exportButton.className = "ui-close";
 		exportButton.innerText = L10n.get("savesLabelExport");
-		exportButton.disabled = !savesAllowed();
-		exportButton.onclick = savesAllowed() ? Save.export : null;
+		if (savesAllowed()) {
+			exportButton.onclick = Save.export;
+			exportButton.classList.add("saveMenuButton");
+		} else exportButton.disabled = true;
 		li = document.createElement("li");
 		li.appendChild(exportButton);
 		container.appendChild(li);
@@ -634,8 +636,13 @@ const idb = (() => {
 			toClipboardButton.id = "saves-toClipboard";
 			toClipboardButton.className = "ui-close";
 			toClipboardButton.innerText = L10n.get("savesLabelToClipboard");
-			toClipboardButton.disabled = !savesAllowed();
-			toClipboardButton.onclick = savesAllowed ? navigator.clipboard.writeText(Save.serialize()) : null;
+			if (savesAllowed()) {
+				toClipboardButton.onclick = () => {
+					navigator.clipboard.writeText(Save.serialize());
+					window.closeOverlay();
+				};
+				toClipboardButton.classList.add("saveMenuButton");
+			} else toClipboardButton.disabled = true;
 			li = document.createElement("li");
 			li.appendChild(toClipboardButton);
 			container.appendChild(li);
@@ -643,6 +650,7 @@ const idb = (() => {
 
 		const importButton = document.createElement("button");
 		importButton.id = "saves-import";
+		importButton.className = "saveMenuButton";
 		importButton.innerText = L10n.get("savesLabelImport");
 		importButton.onclick = () => jQuery(document.createElement("input")).prop("type", "file").on("change", SugarCube.Save.import).trigger("click"); // gotta give it to anthaum for finding this
 		li = document.createElement("li");
@@ -650,7 +658,7 @@ const idb = (() => {
 		container.appendChild(li);
 
 		const clearAllButton = document.createElement("button");
-		clearAllButton.className = "saves-clear";
+		clearAllButton.className = "saves-clear saveMenuButton";
 		clearAllButton.innerText = L10n.get("savesLabelClear");
 		clearAllButton.onclick = () => saveList("confirm clear");
 		li = document.createElement("li");
@@ -768,11 +776,13 @@ const idb = (() => {
 		// previous page button
 		const prevPage = document.createElement("button");
 		prevPage.append("<");
-		prevPage.disabled = listPage === 1;
-		prevPage.onclick = () => {
-			if (listPage > 1) listPage--;
-			saveList("show saves");
-		};
+		if (listPage > 1) {
+			prevPage.classList.add("saveMenuButton");
+			prevPage.onclick = () => {
+				--listPage;
+				saveList("show saves");
+			};
+		} else prevPage.disabled = true;
 		li = document.createElement("li");
 		li.appendChild(prevPage);
 		container.appendChild(li);
@@ -797,7 +807,13 @@ const idb = (() => {
 		// next page button
 		const nextPage = document.createElement("button");
 		nextPage.append(">");
-		nextPage.disabled = listPage >= listPageMax;
+		if (listPage < listPageMax) {
+			nextPage.classList.add("saveMenuButton");
+			nextPage.onclick = () => {
+				++listPage;
+				saveList("show saves");
+			};
+		} else nextPage.disabled = true;
 		nextPage.onclick = () => {
 			if (listPage < listPageMax) listPage++;
 			saveList("show saves");
@@ -830,6 +846,7 @@ const idb = (() => {
 
 		// jump to most recent save button
 		const jumpToLatest = document.createElement("button");
+		jumpToLatest.className = "saveMenuButton";
 		jumpToLatest.innerText = L10n.get("savesPagerJump");
 		jumpToLatest.onclick = () => {
 			// potentially exploitable to allow saving to slots way above the limit, but the limit is arbitrary to begin with, and idb doesn't actually suffer one bit from going beyond that limit
@@ -887,13 +904,10 @@ const idb = (() => {
 			if (!details || !details.date) return oldSaveDescription;
 
 			const oldSaveTitle = document.createElement("p");
-			oldSaveTitle.innerText = L10n.get("savesDescTitle") + details.title;
+			oldSaveTitle.innerText = `${L10n.get("savesDescTitle")} ${details.title}`;
 
 			const oldSaveData = document.createElement("p");
-			oldSaveData.innerText =
-				(details.metadata.saveName ? L10n.get("savesDescName") + details.metadata.saveName : L10n.get("savesDescId") + details.metadata.saveId)
-				+ L10n.get("savesDescDate")
-				+ new Date(details.date).toLocaleString();
+			oldSaveData.innerText = `${details.metadata.saveName ? L10n.get("savesDescName") + details.metadata.saveName : L10n.get("savesDescId") + details.metadata.saveId} ${L10n.get("savesDescDate")} ${new Date(details.date).toLocaleString()}`;
 
 			oldSaveDescription.append(oldSaveTitle, oldSaveData);
 
@@ -972,7 +986,7 @@ const idb = (() => {
 				reqDeleteLabel.innerText = L10n.get("savesLabelDelete");
 				const reqDelete = document.createElement("input");
 				reqDelete.type = "checkbox";
-				reqDelete.checked = setting.warnDelete;
+				reqDelete.checked = settings.warnDelete;
 				reqDelete.onchange = () => updateSettings("warnDelete", reqDelete.checked);
 				reqDeleteLabel.appendChild(reqDelete);
 				li = document.createElement("li");
@@ -989,6 +1003,7 @@ const idb = (() => {
 				ul.className = "buttons";
 				const idbtoggle = document.createElement("button");
 				idbtoggle.id = "saves-idb-toggle";
+				idbtoggle.className = "saveMenuButton";
 				idbtoggle.innerText = L10n.get("savesOptionsUseLegacy");
 				idbtoggle.onclick = () => {
 					updateSettings("active", false);
