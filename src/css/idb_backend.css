@@ -1,5 +1,6 @@
 #saves-export-reminder {
 	padding: 0.5em 1em 0;
+	font-size: 0.96em;
 }
 
 #saves-list-container {
@@ -176,3 +177,4 @@
 #saveList button[id="saves-clear"]:before {
 	content: "\e827\00a0";
 }
+

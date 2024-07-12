@@ -437,6 +437,12 @@ const idb = (() => {
 		return makePromise(details);
 	}
 
+	/**
+	 * get DATA for ALL saves in the db
+	 * WILL fail if db is bigger than 2gb (and probably earlier)
+	 *
+	 * @returns {Array} list of data for all saves in idb
+	 */
 	async function getAllSaves() {
 		if (!open) await openDB();
 		const transactionRequest = db.transaction(["saves"], "readonly");
@@ -619,6 +625,7 @@ const idb = (() => {
 		container.className = "buttons";
 		let li;
 
+		// save to file button
 		const exportButton = document.createElement("button");
 		exportButton.id = "saves-export";
 		exportButton.className = "ui-close";
@@ -631,6 +638,7 @@ const idb = (() => {
 		li.appendChild(exportButton);
 		container.appendChild(li);
 
+		// save to clipboard button
 		if (navigator.clipboard) {
 			const toClipboardButton = document.createElement("button");
 			toClipboardButton.id = "saves-toClipboard";
@@ -648,6 +656,7 @@ const idb = (() => {
 			container.appendChild(li);
 		}
 
+		// load from file button
 		const importButton = document.createElement("button");
 		importButton.id = "saves-import";
 		importButton.className = "saveMenuButton";
@@ -657,6 +666,7 @@ const idb = (() => {
 		li.appendChild(importButton);
 		container.appendChild(li);
 
+		// delete all saves button
 		const clearAllButton = document.createElement("button");
 		clearAllButton.className = "saves-clear saveMenuButton";
 		clearAllButton.innerText = L10n.get("savesLabelClear");
@@ -664,6 +674,18 @@ const idb = (() => {
 		li = document.createElement("li");
 		li.appendChild(clearAllButton);
 		container.appendChild(li);
+
+		return container;
+	}
+
+	/**
+	 * optional extra footer row
+	 */
+	function generateExtraFooterRow () {
+		if (!footerHTML) return null;
+		const container = document.createElement("ul");
+		container.className = "buttons";
+		container.innerHTML = footerHTML;
 
 		return container;
 	}
@@ -948,6 +970,9 @@ const idb = (() => {
 
 				// button row
 				list.appendChild(generateFooterRow());
+
+				// optional footer row
+				if (footerHTML) list.appendChild(generateExtraFooterRow());
 
 				// add pager
 				list.appendChild(generatePager());

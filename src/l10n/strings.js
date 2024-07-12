@@ -79,12 +79,12 @@ var l10nStrings = { // eslint-disable-line no-unused-vars, no-var
 		Saves.
 	*/
 	savesTitle       : 'Saves',
-	savesDisallowed  : 'Saving has been disallowed on this passage.',
+	savesDisallowed  : 'You can\'t save on this passage!',
 	savesIncapable   : '{_warningIntroLacking} the capabilities required to support saves, so saves have been disabled for this session.',
 	savesLabelAuto   : 'Autosave',
 	savesLabelDelete : 'Delete ',
-	savesLabelExport : 'Save to Disk\u2026',
-	savesLabelImport : 'Load from Disk\u2026',
+	savesLabelExport : 'Save to File\u2026',
+	savesLabelImport : 'Load from File\u2026',
 	savesLabelLoad   : 'Load ',
 	savesLabelClear  : 'Delete All',
 	savesLabelSave   : 'Save',
@@ -96,7 +96,7 @@ var l10nStrings = { // eslint-disable-line no-unused-vars, no-var
 		idb related
 	*/
 	savesDisallowedReplay     : 'The scene viewer is currently in use, preventing the use of the save system.',
-	savesExportReminder       : 'Saves here will be lost if your browser cache is cleared. Saving to disk is recommended to avoid save loss.',
+	savesExportReminder       : 'Warning: If your browser cache is cleared, saves here will be lost! Consider saving to file every so often!',
 	savesHeaderSaveLoad       : 'Save/Load',
 	savesHeaderIDName         : 'ID/Name',
 	savesHeaderDetails        : 'Details',
@@ -109,7 +109,7 @@ var l10nStrings = { // eslint-disable-line no-unused-vars, no-var
 	savesPagerSavesPerPage    : 'Saves per page:',
 	savesOptionsConfirmOn     : 'Require confirmation on:',
 	savesOptionsOverwrite     : 'Overwrite ',
-	savesOptionsUseLegacy     : 'Use old legacy save storage',
+	savesOptionsUseLegacy     : 'Switch to legacy save storage',
 	savesWarningSaveOnSlot    : 'Save on slot',
 	savesWarningOverwriteSlot : 'Overwrite save in slot',
 	savesWarningOverwriteID   : 'Save ID does not match, continue with overwrite?',
@@ -117,7 +117,6 @@ var l10nStrings = { // eslint-disable-line no-unused-vars, no-var
 	savesWarningLoad          : 'Load slot',
 	savesWarningDeleteAll     : 'WARNING - DO YOU REALLY WANT TO DELETE ALL SAVES?',
 	savesLabelToClipboard     : 'Save to Clipboard\u2026',
-
 
 	/*
 		Settings.
