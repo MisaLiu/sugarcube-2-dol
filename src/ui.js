@@ -483,6 +483,7 @@ var UI = (() => { // eslint-disable-line no-unused-vars, no-var
 				'Enable indexedDB',
 				!idb.lock
 					? () => {
+						Dialog.create('saves', 'saves').append($(document.createElement('h3')).addClass('saves-loading').text('Loading the save list, please wait...'));
 						idb.updateSettings('active', true);
 						idb.saveList();
 					}

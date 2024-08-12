@@ -661,7 +661,10 @@ const idb = (() => {
 		importButton.id = "saves-import";
 		importButton.className = "saveMenuButton";
 		importButton.innerText = L10n.get("savesLabelImport");
-		importButton.onclick = () => jQuery(document.createElement("input")).prop("type", "file").on("change", SugarCube.Save.import).trigger("click"); // gotta give it to anthaum for finding this
+		importButton.onclick = () => {
+			jQuery(document.createElement("input")).prop("type", "file").on("change", SugarCube.Save.import).trigger("click"); // gotta give it to anthaum for finding this
+			window.closeOverlay();
+		}
 		li = document.createElement("li");
 		li.appendChild(importButton);
 		container.appendChild(li);
