@@ -97,7 +97,7 @@ var UI = (() => { // eslint-disable-line no-unused-vars, no-var
 	function uiOpenSaves(/* options, closeFn */ ...args) {
 		// use idb when available
 		if (idb.active) {
-			Dialog.setup('saves', 'saves');
+			Dialog.create('saves', 'saves').append($(document.createElement('h3')).addClass('saves-loading').text('Loading the save list, please wait...'));
 			idb.saveList();
 		}
 		else uiBuildSaves();

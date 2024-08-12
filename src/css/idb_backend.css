@@ -178,3 +178,7 @@
 	content: "\e827\00a0";
 }
 
+.saves-loading .saves {
+	text-align: center;
+	margin-top: 1em;
+}
