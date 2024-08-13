@@ -22,6 +22,9 @@ var Save = (() => { // eslint-disable-line no-unused-vars, no-var
 	// The upper bound of the saves slots.
 	let _slotsUBound = -1;
 
+	// extra save metadata
+	let _meta = {};
+
 	// Set of onLoad handlers.
 	const _onLoadHandlers = new Set();
 
@@ -384,7 +387,8 @@ var Save = (() => { // eslint-disable-line no-unused-vars, no-var
 		const baseName     = filename == null ? Story.domId : getFilename(filename); // lazy equality for null
 		const saveName     = `${baseName}-${getDatestamp()}.save`;
 		const supplemental = metadata == null ? {} : { metadata }; // lazy equality for null
-		const saveObj      = LZString.compressToBase64(JSON.stringify(_marshal(supplemental, { type : Type.Disk })));
+		const data         = LZString.compressToBase64(JSON.stringify(_marshal(supplemental, { type : Type.Disk })));
+		const saveObj      = data + LZString.compressToBase64(JSON.stringify({ [Story.domId] : data.length }));
 		saveAs(new Blob([saveObj], { type : 'text/plain;charset=UTF-8' }), saveName);
 	}
 
@@ -400,18 +404,7 @@ var Save = (() => { // eslint-disable-line no-unused-vars, no-var
 				return;
 			}
 
-			let saveObj;
-
-			try {
-				saveObj = JSON.parse(
-					/* legacy */ /\.json$/i.test(file.name) || /^\{/.test(reader.result)
-						? reader.result
-						: /* /legacy */ LZString.decompressFromBase64(reader.result)
-				);
-			}
-			catch (ex) { /* no-op; `_unmarshal()` will handle the error */ }
-
-			_unmarshal(saveObj);
+			deserialize(reader.result);
 		});
 
 		// Initiate the file load.
@@ -435,7 +428,8 @@ var Save = (() => { // eslint-disable-line no-unused-vars, no-var
 		}
 
 		const supplemental = metadata == null ? {} : { metadata }; // lazy equality for null
-		return LZString.compressToBase64(JSON.stringify(_marshal(supplemental, { type : Type.Serialize })));
+		const data = LZString.compressToBase64(JSON.stringify(_marshal(supplemental, { type : Type.Serialize })));
+		return data + LZString.compressToBase64(JSON.stringify({ [Story.domId] : data.length }));
 	}
 
 	function deserialize(base64Str) {
@@ -447,7 +441,11 @@ var Save = (() => { // eslint-disable-line no-unused-vars, no-var
 		let saveObj;
 
 		try {
-			saveObj = JSON.parse(LZString.decompressFromBase64(base64Str));
+			const jsonstring = LZString.decompressFromBase64(base64Str);
+			const offset = LZString.compressToBase64(jsonstring).length;
+			const metadata = JSON.parse(LZString.decompressFromBase64(base64Str.slice(offset)));
+			_meta = metadata;
+			saveObj = JSON.parse(jsonstring);
 		}
 		catch (ex) { /* no-op; `_unmarshal()` will handle the error */ }
 
@@ -550,7 +548,8 @@ var Save = (() => { // eslint-disable-line no-unused-vars, no-var
 
 		const saveObj = Object.assign({}, supplemental, {
 			id    : Config.saves.id,
-			state : State.marshalForSave()
+			state : State.marshalForSave(),
+			idx   : supplemental?.idx || 1
 		});
 
 		if (Config.saves.version) {
@@ -680,6 +679,7 @@ var Save = (() => { // eslint-disable-line no-unused-vars, no-var
 				size     : { get : onSaveSize },
 				handlers : { value : _onSaveHandlers }
 			}))
-		}
+		},
+		meta : { get : () => _meta }
 	}));
 })();

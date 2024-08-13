@@ -153,11 +153,9 @@ var State = (() => { // eslint-disable-line no-unused-vars, no-var
 
 		if (!stateObj.hasOwnProperty(noDelta ? 'history' : 'delta') || stateObj[noDelta ? 'history' : 'delta'].length === 0) {
 			if (stateObj.hasOwnProperty('delta')) {
-				console.log("warning: stateObj is delta-encoded when it shouldn't be");
 				noDelta = false;
 			}
 			else if (stateObj.hasOwnProperty('history')) {
-				console.log('warning: stateObj is not delta-encoded when it should be');
 				noDelta = true;
 			}
 			else {
@@ -250,7 +248,7 @@ var State = (() => { // eslint-disable-line no-unused-vars, no-var
 		if (Config.history.maxSessionStates === 0) return;
 
 		const sessionState = session.get('state');
-		if (sessionState.hasOwnProperty('delta')) {
+		if (sessionState?.hasOwnProperty('delta')) {
 			sessionState.history = State.deltaDecode(sessionState.delta);
 			delete sessionState.delta;
 		}
