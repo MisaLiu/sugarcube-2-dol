@@ -680,10 +680,10 @@ var State = (() => { // eslint-disable-line no-unused-vars, no-var
 		return _prng.test(count, granularity, advancerng);
 	}
 
-	function prngRandom() {
+	function prngRandom(args) {
 		if (DEBUG) { console.log('[State/prngRandom()]'); }
 
-		return _prng ? _prng.random() : Math.random();
+		return _prng ? _prng.random(args) : Math.random();
 	}
 
 

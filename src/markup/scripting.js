@@ -364,20 +364,27 @@ var Scripting = (() => { // eslint-disable-line no-unused-vars, no-var
 	/*
 		Returns a pseudo-random whole number (integer) within the range of the given bounds.
 	*/
-	function random(/* [min ,] max */) {
-		let min;
+	function random(/* [min ,] max, useMath */) {
+		let min = 0;
 		let max;
+		let useMath = false;
 
 		switch (arguments.length) {
 		case 0:
 			throw new Error('random called with insufficient parameters');
 		case 1:
-			min = 0;
-			max = Math.trunc(arguments[0]);
-			break;
+				max = Math.trunc(arguments[0]);
+				break;
+		case 2:
+			if (arguments[1] === true) {
+				max = Math.trunc(arguments[0]);
+				useMath = true;
+				break;
+			}
 		default:
 			min = Math.trunc(arguments[0]);
 			max = Math.trunc(arguments[1]);
+			useMath = arguments[2] == true;
 			break;
 		}
 
@@ -391,8 +398,7 @@ var Scripting = (() => { // eslint-disable-line no-unused-vars, no-var
 		if (min > max) {
 			[min, max] = [max, min];
 		}
-
-		return Math.floor(State.random() * (max - min + 1)) + min;
+		return Math.floor(State.random(useMath) * (max - min + 1)) + min;
 	}
 
 	/*
@@ -429,7 +435,6 @@ var Scripting = (() => { // eslint-disable-line no-unused-vars, no-var
 		if (min > max) {
 			[min, max] = [max, min];
 		}
-
 		return State.random() * (max - min) + min;
 	}
 

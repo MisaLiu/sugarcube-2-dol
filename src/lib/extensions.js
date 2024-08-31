@@ -1191,7 +1191,7 @@
 		configurable : true,
 		writable     : true,
 
-		value() {
+		value(useMath) {
 			if (this == null) { // lazy equality for null
 				throw new TypeError('Array.prototype.shuffle called on null or undefined');
 			}
@@ -1203,7 +1203,7 @@
 			}
 
 			for (let i = length - 1; i > 0; --i) {
-				const j = Math.floor(_nativeMathRandom() * (i + 1));
+				const j = Math.floor(_nativeMathRandom(useMath) * (i + 1));
 
 				if (i === j) {
 					continue;

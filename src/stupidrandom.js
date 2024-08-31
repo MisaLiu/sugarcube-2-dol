@@ -18,25 +18,26 @@ class PRNG {
 		// pull is the number of times random() was called, and the main input of our generator.
 		// it doesn't actually have to be an integer, just incrementable
 		this.pull = Number(pull) || 0;
+
 		// seed is the second input for the generator. it has to be below ~1 to stay within MAX_SAFE_INTEGER (although
 		// it doesn't hurt much if it's not), and it shouldn't be below ~0.25, or the factor will have trouble
 		// overflowing as often as it should. still, other values should be possible, for science
 		switch (typeof seed) {
-		case 'number': {
-			if (seed < 0.25 || seed > 1) console.warn(`recommended seed value is between 0.25 and 1, got ${seed}`);
-			this.seed = seed;
-			break;
-		}
-		case 'string': {
-			// map character codes onto an interval between 0.25 and 1
-			// then at some point it came to me that original string is worth preserving, so let's do that
-			this.seed = seed;
-			this.seedInt = this.str2int(seed);
-			break;
-		}
-		default: {
-			this.seed = (Math.random() * 3 + 1) / 4;
-		}
+			case 'number': {
+				if (seed < 0.25 || seed > 1) console.warn(`recommended seed value is between 0.25 and 1, got ${seed}`);
+				this.seed = seed;
+				break;
+			}
+			case 'string': {
+				// map character codes onto an interval between 0.25 and 1
+				// then at some point it came to me that original string is worth preserving, so let's do that
+				this.seed = seed;
+				this.seedInt = this.str2int(seed);
+				break;
+			}
+			default: {
+				this.seed = (Math.random() * 3 + 1) / 4;
+			}
 		}
 	}
 
@@ -56,7 +57,85 @@ class PRNG {
 		const pull = Math.floor((this.pull + peek + seed * 4327) % limiter) + 1;
 		// get some extra entropy by alternating primes
 		const extra = this.primes[pull % (this.primes.length - 1)];
+
 		return pull * seed * extra * this.factor % (limiter - 1) / limiter;
+	}
+
+	/*
+		Returns a pseudo-random whole number (integer) within the range of the given bounds.
+	*/
+	randomInt(/* [min], max, peek */) {
+		let min;
+		let max;
+		let peek = 0;
+
+		switch (arguments.length) {
+			case 0: throw new Error('randomInt called with insufficient parameters');
+			case 1: min = 0; max = arguments[0]; break;
+			default: min = arguments[0]; max = arguments[1]; peek = arguments[2] || 0; break;
+		}
+		if (!Number.isInteger(min) || !Number.isInteger(max) || !Number.isInteger(peek)) throw new Error(`randomInt called with invalid parameters, ${JSON.stringify(arguments)}`);
+
+		return Math.floor(this.random(peek) * (max - min + 1)) + min;
+	}
+
+	/*
+		Returns a pseudo-random real number (floating-point) within the range of the given bounds.
+
+		NOTE: Unlike with its sibling function `random()`, the `max` parameter
+		is exclusive, not inclusive—i.e. the range goes to, but does not include,
+		the given value.
+		actually, i'm not sure it's possible to ever roll min either.
+	*/
+	randomFloat(/* [min], max, peek */) {
+		let min;
+		let max;
+		let peek = 0;
+
+		switch (arguments.length) {
+			case 0: throw new Error('randomFloat called with insufficient parameters');
+			case 1: min = 0.0; max = Number(arguments[0]); break;
+			default: min = Number(arguments[0]); max = Number(arguments[1]); peek = arguments[2] || 0; break;
+		}
+		if (!Number.isFinite(min) || !Number.isFinite(max) || !Number.isInteger(peek)) throw new Error(`randomFloat called with invalid parameters, ${JSON.stringify(arguments)}`);
+
+		return this.random() * (max - min) + min;
+	}
+
+	/*
+		Randomly shuffles an array and returns it.
+	*/
+	shuffle(array, mutate = true) {
+		if (!Array.isArray(array)) throw new Error(`shuffle expected an array, got ${typeof array}`);
+		if (array.length === 0) return;
+
+		const arr = mutate ? array : clone(array);
+		for (let i = arr.length - 1; i > 0; --i) {
+			const j = this.randomInt(0, i);
+
+			if (i === j) 	continue;
+
+			// [arr[i], arr[j]] = [arr[j], arr[i]];
+			const swap = arr[i];
+			arr[i] = arr[j];
+			arr[j] = swap;
+		}
+
+		return arr;
+	}
+
+	toShuffled(array) {
+		return shuffle(array, false);
+	}
+
+	/*
+		Returns a random value from its given arguments.
+	*/
+	either() {
+		const arr = Array.prototype.concat.apply([], arguments);
+		if (arr.length === 0) return;
+
+		return arr[this.randomInt(arr.length - 1)];
 	}
 
 	/**
