@@ -381,6 +381,7 @@ var Scripting = (() => { // eslint-disable-line no-unused-vars, no-var
 				useMath = true;
 				break;
 			}
+			// falls-through
 		default:
 			min = Math.trunc(arguments[0]);
 			max = Math.trunc(arguments[1]);
@@ -398,7 +399,7 @@ var Scripting = (() => { // eslint-disable-line no-unused-vars, no-var
 		if (min > max) {
 			[min, max] = [max, min];
 		}
-		return Math.floor(State.random(useMath) * (max - min + 1)) + min;
+		return Math.floor((useMath ? Math.random() : State.random()) * (max - min + 1)) + min;
 	}
 
 	/*
@@ -408,9 +409,10 @@ var Scripting = (() => { // eslint-disable-line no-unused-vars, no-var
 		is exclusive, not inclusive—i.e. the range goes to, but does not include,
 		the given value.
 	*/
-	function randomFloat(/* [min ,] max */) {
-		let min;
+	function randomFloat(/* [min ,] max, useMath */) {
+		let min = 0.0;
 		let max;
+		let useMath = false;
 
 		switch (arguments.length) {
 		case 0:
@@ -419,9 +421,17 @@ var Scripting = (() => { // eslint-disable-line no-unused-vars, no-var
 			min = 0.0;
 			max = Number(arguments[0]);
 			break;
+		case 2:
+			if (arguments[1] === true) {
+				max = Number(arguments[0]);
+				useMath = true;
+				break;
+			}
+			// falls-through
 		default:
 			min = Number(arguments[0]);
 			max = Number(arguments[1]);
+			useMath = arguments[1] == true;
 			break;
 		}
 
@@ -435,7 +445,7 @@ var Scripting = (() => { // eslint-disable-line no-unused-vars, no-var
 		if (min > max) {
 			[min, max] = [max, min];
 		}
-		return State.random() * (max - min) + min;
+		return (useMath ? Math.random() : State.random()) * (max - min) + min;
 	}
 
 	/*
