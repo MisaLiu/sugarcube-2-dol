@@ -65,14 +65,14 @@ class PRNG {
 		Returns a pseudo-random whole number (integer) within the range of the given bounds.
 	*/
 	randomInt(/* [min], max, peek */) {
-		let min;
+		let min = 0;
 		let max;
 		let peek = 0;
 
 		switch (arguments.length) {
 			case 0: throw new Error('randomInt called with insufficient parameters');
-			case 1: min = 0; max = arguments[0]; break;
-			default: min = arguments[0]; max = arguments[1]; peek = arguments[2] || 0; break;
+			case 1: max = Math.trunc(arguments[0]); break;
+			default: min = Math.trunc(arguments[0]); max = Math.trunc(arguments[1]); peek = arguments[2] || 0; break;
 		}
 		if (!Number.isInteger(min) || !Number.isInteger(max) || !Number.isInteger(peek)) throw new Error(`randomInt called with invalid parameters, ${JSON.stringify(arguments)}`);
 
