@@ -37,7 +37,7 @@ var Save = (() => { // eslint-disable-line no-unused-vars, no-var
 	********************************/
 	let useSplit = () => Story.domId === 'free-cities'; // todo: make it a proper toggle
 	function indexGet() {
-		return storage.get('index');
+		return storage.get('index') ?? savesObjCreate();
 	}
 
 	function splitSave(slot, data) {
