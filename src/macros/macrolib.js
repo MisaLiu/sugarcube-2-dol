@@ -3441,7 +3441,7 @@
 				unwanted by users, who are used to the current behavior from
 				similar macros and constructs.
 			*/
-			Wikifier.stopWikify = 2; // actually, let's make it.
+			if (!Config.navigation.gotohell) Wikifier.stopWikify = 2; // actually, let's make it.
 			setTimeout(() => Engine.play(passage), Engine.minDomActionDelay);
 		}
 	});
