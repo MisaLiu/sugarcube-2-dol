@@ -116,7 +116,7 @@ const idb = (() => {
 		};
 		_active = _settings.active; // one-way sync, only change default when triggered by user, not by fail-safes
 		if (!setting) return;
-		if (!Object.keys(_settings).includes(setting)) return console.warn(`idbupdatesettings: invalid argument: ${setting}`);
+		if (!['warnSave', 'warnLoad', 'warnDelete', 'active', 'useDelta'].includes(setting)) return console.warn(`idbupdatesettings: invalid argument: ${setting}`);
 		if (value == null) return _settings[setting];
 		_settings[setting] = value;
 		_active = _settings.active; // do it again

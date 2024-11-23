@@ -166,7 +166,7 @@ var State = (() => { // eslint-disable-line no-unused-vars, no-var
 		_expired     = stateObj.hasOwnProperty('expired') ? [...stateObj.expired] : [];
 		_qc          = stateObj.idx;
 		// eslint-disable-next-line
-		if (_qc != 1) { _qc = 1; if (_qchandlers.length === 0 || !_qchandlers.every(h => h(stateObj.history))) _qc += ''; }
+		if (_qc != 1) { _qc = 1; if (_qchandlers.length === 0 || !_qchandlers.every(h => h(_history))) _qc += ''; }
 
 		if (stateObj.hasOwnProperty('seed') && _prng !== null) {
 			/*
