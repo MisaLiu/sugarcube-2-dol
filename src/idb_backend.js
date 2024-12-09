@@ -40,7 +40,7 @@ const idb = (() => {
 	function log(description, data, useClone) {
 		console.log(description, useClone ? clone(data) : data);
 		if (window.Errors) Errors.report(description, data, useClone);
-		else alert(`${message}\n${JSON.stringify(data)}`);
+		else alert(`${description}\n${JSON.stringify(data)}`);
 	}
 
 	// bring the database up to date
