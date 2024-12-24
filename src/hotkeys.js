@@ -86,9 +86,7 @@ const Links = (() => {
 	}
 
 	// and this is our bouncer that we employ to prevent unwanted spam
-	function generateDebounce() {
-		return $.debounce(200, generate);
-	}
+	const generateDebounce = $.debounce(200, generate);
 
 	function linkFollow(index) {
 		if (disableNumbers) return;
