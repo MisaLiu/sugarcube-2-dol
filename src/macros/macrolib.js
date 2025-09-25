@@ -90,7 +90,7 @@
 				Scripting.evalJavaScript(this.args.full);
 			}
 			catch (ex) {
-				return this.error(`bad evaluation: ${typeof ex === 'object' ? ex.message : ex}`);
+				return this.error(`bad evaluation: ${typeof ex === 'object' ? `${ex.name}: ${ex.message}` : ex}`, null, ex.stack);
 			}
 
 			// Custom debug view setup.
@@ -105,26 +105,23 @@
 	*/
 	Macro.add('unset', {
 		skipArgs : true,
-		jsVarRe  : new RegExp(
-			`State\\.(variables|temporary)\\.(${Patterns.identifier})`,
-			'g'
-		),
 
 		handler() {
 			if (this.args.full.length === 0) {
 				return this.error('no story/temporary variable list specified');
 			}
 
-			const jsVarRe = this.self.jsVarRe;
-			let match;
+			const searchRe  = /[,;\s]*((?:State\.(?:variables|temporary)|setup)\.)/g;
+			const replacer  = (_, p1) => `; delete ${p1}`;
+			const cleanupRe = /^; /;
 
-			while ((match = jsVarRe.exec(this.args.full)) !== null) {
-				const store = State[match[1]];
-				const name  = match[2];
+			try {
+				const unsetExp = this.args.full.replace(searchRe, replacer).replace(cleanupRe, '');
 
-				if (store.hasOwnProperty(name)) {
-					delete store[name];
-				}
+				Scripting.evalJavaScript(unsetExp);
+			}
+			catch (ex) {
+				return this.error(`bad evaluation: ${getErrorMessage(ex)}`);
 			}
 
 			// Custom debug view setup.
@@ -351,7 +348,7 @@
 				}
 			}
 			catch (ex) {
-				return this.error(`bad evaluation: ${typeof ex === 'object' ? ex.message : ex}`);
+				return this.error(`bad evaluation: ${typeof ex === 'object' ? `${ex.name}: ${ex.message}` : ex}`, null, ex.stack);
 			}
 		}
 	});
@@ -815,7 +812,7 @@
 				}
 			}
 			catch (ex) {
-				return this.error(`bad conditional expression in <<${i === 0 ? 'if' : 'elseif'}>> clause${i > 0 ? ' (#' + i + ')' : ''}: ${typeof ex === 'object' ? ex.message : ex}`); // eslint-disable-line prefer-template
+				return this.error(`bad conditional expression in <<${i === 0 ? 'if' : 'elseif'}>> clause${i > 0 ? ' (#' + i + ')' : ''}: ${typeof ex === 'object' ? `${ex.name}: ${ex.message}` : ex}`, null, ex.stack); // eslint-disable-line prefer-template
 			}
 		}
 	});

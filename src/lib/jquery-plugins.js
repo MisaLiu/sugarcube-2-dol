@@ -43,14 +43,9 @@
 		return function () {
 			const $this = jQuery(this);
 
-			// Exit if the element is disabled.
-			//
-			// NOTE: This should only be necessary for elements which are not disableable
-			// per the HTML specification as disableable elements should be made inert
-			// automatically.
-			if ($this.ariaIsDisabled()) {
-				return;
-			}
+			const dataPassage = $this.attr('data-passage');
+			const initialDataPassage = window && window.SugarCube && window.SugarCube.State && window.SugarCube.State.passage;
+			const savedYOffset = window.pageYOffset;
 
 			// Toggle "aria-pressed" status, if the attribute exists.
 			if ($this.is('[aria-pressed]')) {
@@ -59,6 +54,12 @@
 
 			// Call the true handler.
 			fn.apply(this, arguments);
+
+			const doJump = () => window.scrollTo(0, savedYOffset);
+			if (dataPassage && (window.lastDataPassageLink === dataPassage || initialDataPassage === dataPassage)) {
+				if (Config.navigation.rememberYPos && (!V.options || V.options && V.options.scrollRemember !== false)) doJump();
+			}
+			window.lastDataPassageLink = dataPassage;
 		};
 	}
 

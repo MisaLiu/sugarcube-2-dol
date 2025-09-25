@@ -95,7 +95,12 @@ var UI = (() => { // eslint-disable-line no-unused-vars, no-var
 	}
 
 	function uiOpenSaves(/* options, closeFn */ ...args) {
-		uiBuildSaves();
+		// use idb when available
+		if (idb.active) {
+			Dialog.create('saves', 'saves').append($(document.createElement('h3')).addClass('saves-loading').text('Loading the save list, please wait...'));
+			idb.saveList();
+		}
+		else uiBuildSaves();
 		Dialog.open(...args);
 	}
 
@@ -334,8 +339,9 @@ var UI = (() => { // eslint-disable-line no-unused-vars, no-var
 				$tdSlot.append(document.createTextNode(i + 1));
 
 				if (saves.slots[i]) {
-					// Add the load button.
+					// Add the save and load buttons.
 					$tdLoad.append(
+						createButton('save', 'ui-close', L10n.get('savesLabelSave'), i, Save.slots.save),
 						createButton('load', 'ui-close', L10n.get('savesLabelLoad'), i, slot => {
 							jQuery(document).one(':dialogclosed', () => Save.slots.load(slot));
 						}),
@@ -425,6 +431,14 @@ var UI = (() => { // eslint-disable-line no-unused-vars, no-var
 					L10n.get('savesLabelExport'),
 					savesAllowed ? () => Save.export() : null
 				));
+				if (navigator.clipboard) {
+					$btnBar.append(createActionItem(
+						'toClipboard',
+						'ui-close',
+						L10n.get('savesLabelToClipboard'),
+						savesAllowed ? () => navigator.clipboard.writeText(Save.serialize()) : null
+					));
+				}
 				$btnBar.append(createActionItem(
 					'import',
 					null,
@@ -469,6 +483,23 @@ var UI = (() => { // eslint-disable-line no-unused-vars, no-var
 						: null
 				));
 			}
+
+			const $idbBar = jQuery(document.createElement('ul'))
+				.addClass('buttons')
+				.appendTo($dialogBody);
+
+			$idbBar.append(createActionItem(
+				'idbToggleSaves',
+				null,
+				'Enable indexedDB',
+				!idb.lock
+					? () => {
+						Dialog.create('saves', 'saves').append($(document.createElement('h3')).addClass('saves-loading').text('Loading the save list, please wait...'));
+						idb.updateSettings('active', true);
+						idb.saveList();
+					}
+					: null
+			));
 
 			return true;
 		}

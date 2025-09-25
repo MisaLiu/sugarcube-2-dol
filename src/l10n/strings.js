@@ -79,7 +79,7 @@ var l10nStrings = { // eslint-disable-line no-unused-vars, no-var
 		Saves.
 	*/
 	savesTitle       : 'Saves',
-	savesDisallowed  : 'Saving has been disallowed on this passage.',
+	savesDisallowed  : 'You can\'t save on this passage!',
 	savesIncapable   : '{_warningIntroLacking} the capabilities required to support saves, so saves have been disabled for this session.',
 	savesLabelAuto   : 'Autosave',
 	savesLabelDelete : 'Delete',

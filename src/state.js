@@ -6,7 +6,7 @@
 	Use of this source code is governed by a BSD 2-clause "Simplified" License, which may be found in the LICENSE file.
 
 ***********************************************************************************************************************/
-/* global Config, Diff, Engine, PRNGWrapper, Scripting, clone, session, storage */
+/* global Config, Diff, Engine, PRNG, Scripting, clone, session, storage, */
 
 var State = (() => { // eslint-disable-line no-unused-vars, no-var
 	'use strict';
@@ -31,6 +31,8 @@ var State = (() => { // eslint-disable-line no-unused-vars, no-var
 	// Temporary variables object.
 	let _tempVariables = {};
 
+	let _qc = 1;
+	let _qchandlers = [];
 
 	/*******************************************************************************************************************
 		State Functions.
@@ -61,13 +63,13 @@ var State = (() => { // eslint-disable-line no-unused-vars, no-var
 	/*
 		Restores the story state from the active session.
 	*/
-	function stateRestore() {
+	function stateRestore(soft) {
 		if (DEBUG) { console.log('[State/stateRestore()]'); }
 
 		/*
 			Attempt to restore an active session.
 		*/
-		if (session.has('state')) {
+		if (session.has('state') && !soft) {
 			/*
 				Retrieve the session.
 			*/
@@ -86,7 +88,40 @@ var State = (() => { // eslint-disable-line no-unused-vars, no-var
 			return true;
 		}
 
+		// perform soft reset from history
+		if (soft) {
+			const frame = _history[_activeIndex];
+			if (!frame) return false;
+			momentActivate(frame);
+			return true;
+		}
+
 		return false;
+	}
+
+	function reduceHistorySize(stateObj, targetSize) {
+		if (!targetSize) return;
+		// pick up which frames to preserve, aiming at preserving the frames both before and after the active one
+		const currentIndex = stateObj.index;
+		const currentHistoryLength = stateObj.history.length;
+		targetSize = Math.min(currentHistoryLength, targetSize);
+		const invertedIndex = currentHistoryLength - 1 - currentIndex;
+		let startingIndex = 0;
+		const radius = Math.floor(targetSize / 2); // how many frames can we cover on both sides from active frame
+
+		if (currentIndex < invertedIndex) { // active index is closer to the beginning of the array [* i * * * *]
+			if (radius >= currentIndex) startingIndex = 0; // there's enough space to include the oldest frame [(* i *) * * *]
+			else startingIndex = currentIndex - radius; // starting index will extend into the past as much as the radius can allow [* (* i *) * *]
+		}
+		else { // active index is closer to the end of the array [* * * * i *]
+			if (radius >= invertedIndex) startingIndex = currentHistoryLength - targetSize; // enough space to include the newest frame [* * * (* i *)]
+			else startingIndex = currentIndex - radius; // [* * (* i *) *]
+		}
+		stateObj.index -= startingIndex; // correct the index
+		stateObj.history.slice(0, startingIndex).forEach(m => stateObj.expired.push(m.title)); // expire removed history
+		stateObj.history = stateObj.history.slice(startingIndex, startingIndex + targetSize);
+
+		return stateObj;
 	}
 
 	/*
@@ -164,9 +199,12 @@ var State = (() => { // eslint-disable-line no-unused-vars, no-var
 		/*
 			Restore the properties.
 		*/
-		_history     = noDelta ? clone(stateObj.history) : historyDeltaDecode(stateObj.delta);
+		_history     = hasHistory ? clone(stateObj.history) : historyDeltaDecode(stateObj.delta);
 		_activeIndex = stateObj.index;
 		_expired     = stateObj.hasOwnProperty('expired') ? [...stateObj.expired] : [];
+		_qc          = stateObj.idx;
+		// eslint-disable-next-line
+		if (_qc != 1) { _qc = 1; if (_qchandlers.length === 0 || !_qchandlers.every(h => h(_history))) _qc += ''; }
 
 		if (stateObj.hasOwnProperty('seed') && _prng !== null) {
 			/*
@@ -192,8 +230,8 @@ var State = (() => { // eslint-disable-line no-unused-vars, no-var
 	/*
 		Restores the story state from a marshaled save-compatible story state serialization object.
 	*/
-	function stateUnmarshalForSave(stateObj) {
-		return stateUnmarshal(stateObj, true);
+	function stateUnmarshalForSave(stateObj, type) {
+		return stateUnmarshal(stateObj, type);
 	}
 
 	/*
@@ -408,6 +446,29 @@ var State = (() => { // eslint-disable-line no-unused-vars, no-var
 
 		return _active;
 	}
+
+	function updateSession() {
+		/*
+			Update the active session.
+			todo: refactor it all and move to using setSessionState?
+		*/
+		let pass = false;
+		let depth = Math.min(Config.history.maxSessionStates, State.history.length);
+		while (depth > 0 && !pass) {
+			try {
+				const state = stateMarshal(false, depth);
+				state.idx = State.qc;
+				session.set('state', state);
+				pass = true;
+			}
+			catch { // depth is too high to fit sessionStorage
+				console.log('session.set error, reducing maxSessionStates');
+				depth--;
+			}
+		}
+	}
+	// save game state to load it back after f5
+	window.addEventListener('beforeunload', updateSession);
 
 
 	/*******************************************************************************************************************
@@ -735,7 +796,7 @@ var State = (() => { // eslint-disable-line no-unused-vars, no-var
 	function prngRandom() {
 		if (DEBUG) { console.log('[State/prngRandom()]'); }
 
-		return _prng ? _prng.random() : Math.random();
+		return _prng ? _prng.random(args) : Math.random();
 	}
 
 
@@ -910,6 +971,11 @@ var State = (() => { // eslint-disable-line no-unused-vars, no-var
 		T : { get() { return _tempVariables; }, configurable : true }
 	});
 
+	function prngPullSet(pull) {
+		if (!_prng) return;
+		if (Number.isInteger(pull)) return _prng.pull = pull;
+		throw new Error(`pullSet: invalid parameter: ${pull}`);
+	}
 	/*******************************************************************************************************************
 		Module Exports.
 	*******************************************************************************************************************/
@@ -1000,6 +1066,12 @@ var State = (() => { // eslint-disable-line no-unused-vars, no-var
 				size    : { get : metadataSize }
 			}))
 		},
+
+		/*
+			qc stuff
+		*/
+		qc    : { get() { return _qc;  } },
+		qcadd : { value(fn) { if (typeof fn === 'function') _qchandlers.push(fn); } },
 
 		/*
 			Legacy Aliases.

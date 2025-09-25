@@ -486,7 +486,34 @@
 						return false;
 					}
 				}
+				return lexer.pos;
+			}
 
+			function genericSlurp(lexer, openChar, closeChar, initCount) {
+				let count = initCount;
+
+				loop: for (;;) {
+					const ch = lexer.next();
+
+					switch (ch) {
+					case openChar:
+						count++;
+						break;
+
+					case closeChar:
+						count--;
+
+						if (count === 0) {
+							break loop;
+						}
+
+						break;
+
+					case EOF:
+					case '\n':
+						return false;
+					}
+				}
 				return lexer.pos;
 			}
 
@@ -1077,15 +1104,6 @@
 		}
 	});
 
-	Wikifier.Parser.add({
-		name     : 'doubleDollarSign',
-		profiles : ['core'],
-		match    : '\\${2}', // eslint-disable-line no-template-curly-in-string
-
-		handler(w) {
-			jQuery(document.createTextNode('$')).appendTo(w.output);
-		}
-	});
 
 	Wikifier.Parser.add({
 		/*
@@ -1101,7 +1119,7 @@
 		*/
 		name     : 'nakedVariable',
 		profiles : ['core'],
-		match    : `${Patterns.variable}(?:(?:\\.${Patterns.identifier})|(?:\\[\\d+\\])|(?:\\["(?:\\\\.|[^"\\\\])+"\\])|(?:\\['(?:\\\\.|[^'\\\\])+'\\])|(?:\\[${Patterns.variable}\\]))*`,
+		match    : `${Patterns.variable}(?:(?:\\??\\.${Patterns.identifier})|(?:${Patterns.insideParensRecursive})|(?:\\["(?:\\\\.|[^"\\\\])*"\\])|(?:\\['(?:\\\\.|[^'\\\\])*'\\]))*(?:\\((?:${Patterns.insideParensRecursive}|.*?)*\\))?`,
 
 		handler(w) {
 			const result = State.getVar(w.matchText);

@@ -215,8 +215,10 @@ var Passage = (() => { // eslint-disable-line no-unused-vars, no-var
 			const frag = document.createDocumentFragment();
 			new Wikifier(frag, this.processText(), options);
 
-			// Update the excerpt cache to reflect the rendered text.
-			this._excerpt = Passage.getExcerptFromNode(frag);
+			// Update the excerpt cache to reflect the rendered text, if we need it for the passage description
+			if (Config.passages.descriptions == null) {
+				this._excerpt = Passage.getExcerptFromNode(frag);
+			}
 
 			return frag;
 		}

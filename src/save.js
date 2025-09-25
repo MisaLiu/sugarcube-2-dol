@@ -47,17 +47,6 @@ var Save = (() => { // eslint-disable-line no-unused-vars, no-var
 		let saves   = savesObjGet();
 		let updated = false;
 
-		/* legacy */
-		// Convert an ancient saves array into a new saves object.
-		if (Array.isArray(saves)) {
-			saves = {
-				autosave : null,
-				slots    : saves
-			};
-			updated = true;
-		}
-		/* /legacy */
-
 		// Handle the author changing the number of save slots.
 		if (Config.saves.slots !== saves.slots.length) {
 			if (Config.saves.slots < saves.slots.length) {
@@ -102,12 +91,17 @@ var Save = (() => { // eslint-disable-line no-unused-vars, no-var
 	}
 
 	function savesObjGet() {
-		const saves = storage.get('saves');
+		const saves = storage.get(useSplit() ? 'index' : 'saves');
 		return saves === null ? savesObjCreate() : saves;
 	}
 
 	function savesObjClear() {
 		storage.delete('saves');
+		if (useSplit()) {
+			storage.delete('index');
+			storage.delete('autosave');
+			for (let i = 0; i < Config.save.slots - 1; i++) storage.delete(`slot${i}`);
+		}
 		return true;
 	}
 
@@ -124,7 +118,7 @@ var Save = (() => { // eslint-disable-line no-unused-vars, no-var
 	}
 
 	function autosaveHas() {
-		const saves = savesObjGet();
+		const saves = useSplit() ? { autosave : storage.get('autosave') } : savesObjGet();
 
 		if (saves.autosave === null) {
 			return false;
@@ -134,12 +128,18 @@ var Save = (() => { // eslint-disable-line no-unused-vars, no-var
 	}
 
 	function autosaveGet() {
-		const saves = savesObjGet();
+		const saves = useSplit() ? { autosave : storage.get('autosave') } : savesObjGet();
 		return saves.autosave;
 	}
 
 	function autosaveLoad() {
-		const saves = savesObjGet();
+		// idb intercept
+		if (idb.active) {
+			idb.loadState(0);
+			return true;
+		}
+
+		const saves = useSplit() ? { autosave : storage.get('autosave') } : savesObjGet();
 
 		if (saves.autosave === null) {
 			return false;
@@ -171,12 +171,16 @@ var Save = (() => { // eslint-disable-line no-unused-vars, no-var
 			supplemental.metadata = metadata;
 		}
 
-		saves.autosave = _marshal(supplemental, { type : Type.Autosave });
+		const saveData = _marshal(supplemental, { type : Type.Autosave });
+		if (useSplit()) return splitSave('autosave', saveData);
+		saves.autosave = saveData;
 
 		return _savesObjSave(saves);
 	}
 
 	function autosaveDelete() {
+		if (useSplit()) return splitDelete('autosave');
+
 		const saves = savesObjGet();
 		saves.autosave = null;
 		return _savesObjSave(saves);
@@ -239,7 +243,7 @@ var Save = (() => { // eslint-disable-line no-unused-vars, no-var
 			return null;
 		}
 
-		return saves.slots[slot];
+		return useSplit() ? storage.get(`slot${slot}`) : saves.slots[slot];
 	}
 
 	function slotsLoad(slot) {
@@ -253,7 +257,7 @@ var Save = (() => { // eslint-disable-line no-unused-vars, no-var
 			return false;
 		}
 
-		return _unmarshal(saves.slots[slot]);
+		return _unmarshal(useSplit() ? storage.get(`slot${slot}`) : saves.slots[slot]);
 	}
 
 	function slotsSave(slot, title, metadata) {
@@ -287,7 +291,10 @@ var Save = (() => { // eslint-disable-line no-unused-vars, no-var
 			supplemental.metadata = metadata;
 		}
 
-		saves.slots[slot] = _marshal(supplemental, { type : Type.Slot });
+		const saveData = _marshal(supplemental, { type : Type.Slot });
+		if (useSplit()) return splitSave(slot, saveData);
+
+		saves.slots[slot] = saveData;
 
 		return _savesObjSave(saves);
 	}
@@ -302,6 +309,8 @@ var Save = (() => { // eslint-disable-line no-unused-vars, no-var
 		if (slot >= saves.slots.length) {
 			return false;
 		}
+
+		if (useSplit()) return splitDelete(slot);
 
 		saves.slots[slot] = null;
 		return _savesObjSave(saves);
@@ -348,7 +357,8 @@ var Save = (() => { // eslint-disable-line no-unused-vars, no-var
 		const baseName     = filename == null ? Story.domId : getFilename(filename); // lazy equality for null
 		const saveName     = `${baseName}-${getDatestamp()}.save`;
 		const supplemental = metadata == null ? {} : { metadata }; // lazy equality for null
-		const saveObj      = LZString.compressToBase64(JSON.stringify(_marshal(supplemental, { type : Type.Disk })));
+		const data         = LZString.compressToBase64(JSON.stringify(_marshal(supplemental, { type : Type.Disk })));
+		const saveObj      = data + LZString.compressToBase64(JSON.stringify({ [Story.domId] : data.length }));
 		saveAs(new Blob([saveObj], { type : 'text/plain;charset=UTF-8' }), saveName);
 	}
 
@@ -399,7 +409,9 @@ var Save = (() => { // eslint-disable-line no-unused-vars, no-var
 		}
 
 		const supplemental = metadata == null ? {} : { metadata }; // lazy equality for null
-		return LZString.compressToBase64(JSON.stringify(_marshal(supplemental, { type : Type.Serialize })));
+		supplemental.idx = State.qc;
+		const data = LZString.compressToBase64(JSON.stringify(_marshal(supplemental, { type : Type.Serialize })));
+		return data + LZString.compressToBase64(JSON.stringify({ [Story.domId] : data.length }));
 	}
 
 	function deserialize(base64Str) {
@@ -411,11 +423,16 @@ var Save = (() => { // eslint-disable-line no-unused-vars, no-var
 		let saveObj;
 
 		try {
-			saveObj = JSON.parse(LZString.decompressFromBase64(base64Str));
+			const jsonstring = LZString.decompressFromBase64(base64Str);
+			const offset = LZString.compressToBase64(jsonstring).length;
+			const metadata = JSON.parse(LZString.decompressFromBase64(base64Str.slice(offset)));
+			_meta = metadata;
+			saveObj = JSON.parse(jsonstring);
+			if (_meta?.[Story.domId] !== offset) saveObj.idx += '';
 		}
 		catch (ex) { /* no-op; `_unmarshal()` will handle the error */ }
 
-		if (!_unmarshal(saveObj)) {
+		if (!_unmarshal(saveObj, 'file')) {
 			return null;
 		}
 
@@ -515,7 +532,8 @@ var Save = (() => { // eslint-disable-line no-unused-vars, no-var
 
 		const saveObj = Object.assign({}, supplemental, {
 			id    : Config.saves.id,
-			state : State.marshalForSave()
+			state : State.marshalForSave(),
+			idx   : State.qc
 		});
 
 		if (Config.saves.version) {
@@ -569,9 +587,10 @@ var Save = (() => { // eslint-disable-line no-unused-vars, no-var
 
 			_onLoadHandlers.forEach(fn => fn(saveObj));
 
-			if (saveObj.id !== Config.saves.id) {
-				throw new Error(L10n.get('errorSaveIdMismatch'));
-			}
+			_onLoadHandlers.forEach(fn => fn(saveObj));
+
+			if (saveObj.id !== Config.saves.id) throw new Error(L10n.get('errorSaveIdMismatch'));
+			saveObj.state.idx = saveObj.idx || '';
 
 			// Restore the state.
 			State.unmarshalForSave(saveObj.state); // may also throw exceptions
